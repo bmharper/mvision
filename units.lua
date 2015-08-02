@@ -5,49 +5,125 @@ local function ccv_path(config, file)
 	return "third_party/t2-output/win64-mingw-" .. config .. "-default/" .. file
 end
 
-local nudom = SharedLibrary {
-	Name = "nudom",
-	Libs = { "opengl32.lib", "user32.lib", "gdi32.lib" },
-	SourceDir = "../nudom/nudom/",
-	Includes = { "../nudom/nudom/" },
-	PrecompiledHeader = {
-		Source = "../nudom/nudom/pch.cpp",
-		Header = "pch.h",
-		Pass = "PchGen",
-	},
-	Sources = {
-		--Glob { Dir = "../nudom/nudom/", Extensions = { ".h" }, Recursive = true },
-		"nuDefs.cpp",
-		"nuDoc.cpp",
-		"nuDomEl.cpp",
-		"nuEvent.cpp",
-		"nuLayout.cpp",
-		"nuMem.cpp",
-		"nuQueue.cpp",
-		"nuPlatform.cpp",
-		"nuString.cpp",
-		"nuStringTable.cpp",
-		"nuStyle.cpp",
-		"nuStyleParser.cpp",
-		"nuSysWnd.cpp",
-		"nuProcessor.cpp",
-		"nuProcessor_Win32.cpp",
-		"Image/nuImage.cpp",
-		"Image/nuImageStore.cpp",
-		"Render/nuRenderer.cpp",
-		"Render/nuRenderGL.cpp",
-		"Render/nuRenderDoc.cpp",
-		"Render/nuRenderDomEl.cpp",
-		"Render/nuStyleResolve.cpp",
-		"Text/nuTextCache.cpp",
-		"Text/nuTextDefs.cpp",
-		"../dependencies/Panacea/Containers/queue.cpp",
-		"../dependencies/Panacea/Platform/syncprims.cpp",
-		"../dependencies/Panacea/Platform/err.cpp",
-		"../dependencies/Panacea/Strings/fmt.cpp",
-		"../dependencies/glext.cpp",
+local function xo_path(config, file)
+	return "../xo/t2-output/win64-msvc2013-" .. config .. "-default/" .. file
+end
+
+local winKernelLibs = { "kernel32.lib", "user32.lib", "gdi32.lib", "winspool.lib", "advapi32.lib", "shell32.lib", "comctl32.lib", 
+						"uuid.lib", "ole32.lib", "oleaut32.lib", "shlwapi.lib", "OLDNAMES.lib", "wldap32.lib", "wsock32.lib",
+						"Psapi.lib", "Msimg32.lib", "Comdlg32.lib", "RpcRT4.lib", "Iphlpapi.lib", "Delayimp.lib" }
+
+local winDebugFilter = "win*-*-debug"
+local winReleaseFilter = "win*-*-release"
+
+-- Dynamic (msvcr110.dll etc) CRT linkage
+local winLibsDynamicCRTDebug = tundra.util.merge_arrays( { "msvcrtd.lib", "msvcprtd.lib", "comsuppwd.lib" }, winKernelLibs )
+local winLibsDynamicCRTRelease = tundra.util.merge_arrays( { "msvcrt.lib", "msvcprt.lib", "comsuppw.lib" }, winKernelLibs )
+
+winLibsDynamicCRTDebug.Config = winDebugFilter
+winLibsDynamicCRTRelease.Config = winReleaseFilter
+
+-- Static CRT linkage
+local winLibsStaticCRTDebug = tundra.util.merge_arrays( { "libcmtd.lib", "libcpmtd.lib", "comsuppwd.lib" }, winKernelLibs )
+local winLibsStaticCRTRelease = tundra.util.merge_arrays( { "libcmt.lib", "libcpmt.lib", "comsuppw.lib" }, winKernelLibs )
+
+winLibsStaticCRTDebug.Config = winDebugFilter
+winLibsStaticCRTRelease.Config = winReleaseFilter
+
+local winDynamicOpts = {
+	{ "/MDd";					Config = winDebugFilter },
+	{ "/MD";					Config = winReleaseFilter },
+}
+
+local winStaticOpts = {
+	{ "/MTd";					Config = winDebugFilter },
+	{ "/MT";					Config = winReleaseFilter },
+}
+
+local winDynamicEnv = {
+	CCOPTS = winDynamicOpts,
+	CXXOPTS = winDynamicOpts,
+}
+
+local winStaticEnv = {
+	CCOPTS = winStaticOpts,
+	CXXOPTS = winStaticOpts,
+}
+
+local crtDynamic = ExternalLibrary {
+	Name = "crtdynamic",
+	Propagate = {
+		Env = winDynamicEnv,
+		Libs = {
+			winLibsDynamicCRTDebug,
+			winLibsDynamicCRTRelease,
+		},
 	},
 }
+
+local crtStatic = ExternalLibrary {
+	Name = "crtstatic",
+	Propagate = {
+		Env = winStaticEnv,
+		Libs = {
+			winLibsStaticCRTDebug,
+			winLibsStaticCRTRelease,
+		},
+	},
+}
+
+local crt = crtDynamic
+
+local xo_use_amalgamation = false
+local xo, xo_env
+
+if xo_use_amalgamation then
+	xo_env = ExternalLibrary {
+		Name = "xo_env",
+		Propagate = {
+			Defines = {
+				"MVISION_USE_XO_AMALGAMATION=1"
+			},
+		},
+	}
+	xo = SharedLibrary {
+		Name = "xo",
+		Libs = { "opengl32.lib", "user32.lib", "gdi32.lib", "shell32.lib", "D3D11.lib", "d3dcompiler.lib", },
+		Sources = {
+			"../xo/amalgamation/xo-amalgamation.cpp",
+			"../xo/amalgamation/xo-amalgamation-freetype.c",
+		},
+	}
+else
+	xo_env = ExternalLibrary {
+		Name = "xo_env",
+		Propagate = {
+			Defines = {
+				"MVISION_USE_XO_AMALGAMATION=0"
+			},
+		},
+	}
+	xo = ExternalLibrary {
+		Name = "xo",
+		Propagate = {
+			Libs = {
+				"xo.lib"
+			},
+			Env = {
+				LIBPATH = {
+					{ xo_path("debug", "");   Config = "win64-*-debug-default" },
+					{ xo_path("release", ""); Config = "win64-*-release-default" },
+				},
+			},
+		},
+	}
+
+	local copy_xo_lib = CopyFile {
+		Source = xo_path("$(CURRENT_VARIANT)", "xo.dll"),
+		Target = '$(OBJECTDIR)/xo.dll'
+	}
+	Default(copy_xo_lib)
+end
 
 local HelloWorld = Program {
 	Name = "HelloWorld",
@@ -59,22 +135,22 @@ local HelloWorld = Program {
 local WebcamShow = Program {
 	Name = "WebcamShow",
 	SourceDir = "src/",
-	Depends = { nudom },
+	Depends = { xo_env, xo, crt },
 	Env = {
 		LIBPATH = {
 			{ ccv_path("debug", "");   Config = "win64-*-debug-default" },
 			{ ccv_path("release", ""); Config = "win64-*-release-default" },
 		},
 	},
-	Libs = { "mfplat.lib", "mf.lib", "mfreadwrite.lib", "mfuuid.lib", "d3d9.lib", "shlwapi.lib", "user32.lib", "ole32.lib", "libccv.lib", },
-	Includes = { "src/", "../nudom", ".", },
+	Libs = { "mfplat.lib", "mf.lib", "mfreadwrite.lib", "mfuuid.lib", "d3d9.lib", "shlwapi.lib", "user32.lib", "ole32.lib", "libccv.lib", "opengl32.lib", "user32.lib", "gdi32.lib", },
+	Includes = { "src/", "../", ".", }, -- the ../ is for /xo/...
 	PrecompiledHeader = {
 		Source = "src/pch.cpp",
 		Header = "pch.h",
 		Pass = "PchGen",
 	},
 	Sources = {
-		"nuMain.cpp",
+		"xoMain.cpp",
 		--"VideoCapture.cpp",
 		"WebcamShow.cpp",
 		"Tracker.cpp",
@@ -110,6 +186,6 @@ Default(copy_libccv)
 --	},
 --}
 
-Default(nudom)
+--Default(xo)
 --Default(playcap)
 Default(WebcamShow)

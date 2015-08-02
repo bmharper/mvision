@@ -5,7 +5,13 @@
 
 #include <shlwapi.h>
 
-#include "nudom/nudom.h"
+#if MVISION_USE_XO_AMALGAMATION
+#	define XO_AMALGAMATION
+#	include <xo/amalgamation/xo-amalgamation.h>
+#else
+#	include <xo/xo/xo.h>
+#endif
+
 //#include <VideoCapture.h>
 
 #include <windows.h>

@@ -62,4 +62,26 @@ Build {
 			},
 		},
 	},
+	IdeGenerationHints = {
+		Msvc = {
+			-- Remap config names to MSVC platform names (affects things like header scanning & debugging)
+			PlatformMappings = {
+				['win64-msvc'] = 'x64',
+				['win32-msvc'] = 'Win32',
+				['win64-mingw'] = 'MinGW-64',
+			},
+			-- Remap variant names to MSVC friendly names
+			VariantMappings = {
+				['release-default']    = 'Release',
+				['debug-default']      = 'Debug',
+				['release-analyze']    = 'Release Analyze',
+				['debug-analyze']      = 'Debug Analyze',
+			},
+		},
+		-- Override solutions to generate and what units to put where.
+		MsvcSolutions = {
+			['mvision.sln'] = {}, -- receives all the units due to empty set
+		},
+		BuildAllByDefault = true,
+	},
 }

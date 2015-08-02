@@ -2,64 +2,60 @@
 #include "win_capture/capture_device.h"
 #include "Tracker.h"
 
-static nuSysWnd*		MainWnd;
+static xoSysWnd*		MainWnd;
 static CaptureDevice*	Camera;
 static int				Entropy1;
 static int				Entropy2;
 static Tracker*			Track;
-static nuDomEl*			TrackDiv;
+static xoDomNode*		TrackDiv;
+static xoInternalID		CanvasID;
 
-static bool OnTouch( const nuEvent& ev );
-static bool OnTimer( const nuEvent& ev );
+static bool OnTouch( const xoEvent& ev );
+static bool OnTimer( const xoEvent& ev );
 static void InitializeCamera();
 
-void nuMain( nuMainEvent ev )
+void xoMain(xoMainEvent ev)
 {
-	switch ( ev )
+	switch (ev)
 	{
-	case nuMainEventInit:
-		{
-			MainWnd = nuSysWnd::CreateWithDoc();
-			nuDoc* doc = MainWnd->Doc();
+	case xoMainEventInit:
+	{
+		MainWnd = xoSysWnd::CreateWithDoc();
+		xoDoc* doc = MainWnd->Doc();
 
-			//for ( int i = 0; i < 1; i++ )
-			//{
-			//	nuDomEl* div = doc->Root.AddChild( nuTagDiv );
-			//	div->StyleParse( "width: 100px; height: 100px; border-radius: 15px; display: inline;" );
-			//	div->StyleParse( "margin: 3px;" );
-			//	div->StyleParse( "background: #e00e" );
-			//}
+		//xoDomNode* big = doc->Root.AddNode(xoTagDiv);
+		//big->StyleParse("width: 640px; height: 480px;");
+		//big->StyleParse("background: #ffaf");
 
-			nuDomEl* big = doc->Root.AddChild( nuTagDiv );
-			big->StyleParse( "width: 640px; height: 480px; display: inline;" );
-			//big->StyleParse( "margin: 3px;" );
-			big->StyleParse( "background: #ffff" );
+		xoDomCanvas* canvas = doc->Root.AddCanvas();
+		//canvas->StyleParse("width: 640px; height: 480px;");
+		canvas->SetSize(640, 480);
+		canvas->StyleParse("background: #ffaf");
+		CanvasID = canvas->GetInternalID();
 
-			TrackDiv = big->AddChild( nuTagDiv );
-			TrackDiv->StyleParse( "width: 30px; height: 30px; display: inline; position: absolute; left: 5px; top: 5px;" );
-			//TrackDiv->StyleParse( "margin: 0px;" );
-			TrackDiv->StyleParse( "background: #0a0a" );
+		//TrackDiv = big->AddNode(xoTagDiv);
+		//TrackDiv->StyleParse("width: 30px; height: 30px; display: inline; position: absolute; left: 5px; top: 5px;");
+		//TrackDiv->StyleParse("background: #0a0a");
 
-			nuStyle style = big->GetStyle();
-			nuStyleAttrib bgimage;
-			//bgimage.SetBackgroundImage( nuImageStore::NullImageName, doc );
-			bgimage.SetBackgroundImage( "NULL", doc );
-			style.Set( bgimage );
-			big->HackSetStyle( style );
+		//xoStyle style = big->GetStyle();
+		//xoStyleAttrib bgimage;
+		//bgimage.SetBackgroundImage("NULL", doc);
+		//style.Set(bgimage);
+		//big->HackSetStyle(style);
 
-			doc->Root.OnMouseMove( OnTouch, big );
-			doc->Root.OnTouch( OnTouch, big );
-			doc->Root.OnTimer( OnTimer, big );
+		doc->Root.OnMouseMove(OnTouch, canvas);
+		doc->Root.OnTouch(OnTouch, canvas);
+		doc->Root.OnTimer(OnTimer, canvas);
 
-			MainWnd->Show();
+		MainWnd->Show();
 
-			InitializeCamera();
-		}
-		break;
-	case nuMainEventShutdown:
-		if ( Camera )
+		InitializeCamera();
+	}
+	break;
+	case xoMainEventShutdown:
+		if (Camera)
 			Camera->Close();
-		SafeRelease( &Camera );
+		SafeRelease(&Camera);
 		MFShutdown();
 		CoUninitialize();
 		delete Track;
@@ -88,80 +84,90 @@ static void AddToTracker( int width, int height, void* rgb24 )
 	TrackDiv->StyleParsef( "left: %dpx; top: %dpx; width: %dpx; height: %dpx;", box.x, box.y, box.width, box.height );
 }
 
-bool OnTimer( const nuEvent& ev )
+bool OnTimer(const xoEvent& ev)
 {
-	nuDomEl* big = (nuDomEl*) ev.Context;
-	nuDoc* doc = big->GetDoc();
+	//xoDomEl* big = (xoDomEl*) ev.Context;
+	xoDomCanvas* canvas = (xoDomCanvas*) ev.Context;
+	xoDoc* doc = canvas->GetDoc();
 
-	if ( Camera )
+	if (Camera)
 	{
 		void* cameraFrame = Camera->GetNextFrame();
-		if ( cameraFrame )
+		if (cameraFrame)
 		{
-			nuImage* img = new nuImage();
+			//xoImage* img = new xoImage();
 			int width = Camera->GetWidth();
 			int height = Camera->GetHeight();
-			uint32* buf = (uint32*) malloc( width * height * 4 );
+			//uint32* buf = (uint32*) malloc(width * height * 4);
+			auto c2d = canvas->GetCanvas2D();
+
 			uint8* lineIn = (uint8*) cameraFrame;
-			uint32* lineOut = buf;
-			for ( int y = 0; y < height; y++ )
+			//uint32* lineOut = buf;
+			for (int y = 0; y < height; y++)
 			{
+				uint32* lineOut = (uint32*) c2d->RowPtr(y);
 				uint8* in = lineIn;
-				for ( int x = 0; x < width; x++, in += 3 )
-					lineOut[x] = NURGBA(in[2], in[1], in[0], 255);
+				for (int x = 0; x < width; x++, in += 3)
+					lineOut[x] = xoRGBA::RGBA(in[2], in[1], in[0], 255).u;
 				lineIn += width * 3;
-				lineOut += width;
+				//lineOut += width;
 			}
-			img->Set( width, height, buf );
-			AddToTracker( width, height, cameraFrame );
-			free(buf);
+			//img->Set(xoTexFormatRGBA8, width, height, buf);
+			//AddToTracker(width, height, cameraFrame);
+			//free(buf);
+			c2d->Invalidate();
+			canvas->ReleaseCanvas(c2d);
 			free(cameraFrame);
-			doc->Images.Set( "myimage", img );
+			//doc->Images.Set("myimage", img);
 		}
 	}
 	else
 	{
 		const int width = 64;
 		const int height = 48;
-		nuImage* img = new nuImage();
+		xoImage* img = new xoImage();
 		size_t bsize = width * height * 4;
-		uint32* buf = (uint32*) malloc( bsize );
-		nuRGBA c;
+		uint32* buf = (uint32*) malloc(bsize);
+		xoRGBA c;
 		c.r = (uint8) (Entropy1 >> 1);
 		c.g = (uint8) (Entropy2 >> 2);
 		c.b = 0;
 		c.a = 255;
 		Entropy1++;
 		Entropy2++;
-		for ( int y = 0; y < height; y++ )
+		for (int y = 0; y < height; y++)
 		{
 			uint32* line = buf + y * width;
-			for ( int x = 0; x < width; x++ )
+			for (int x = 0; x < width; x++)
 			{
 				c.r++;
 				c.g++;
 				line[x] = c.u;
 			}
 		}
-		img->Set( width, height, buf );
-		free( buf );
-		doc->Images.Set( "myimage", img );
+		img->Set(xoTexFormatRGBA8, width, height, buf);
+		free(buf);
+		doc->Images.Set("myimage", img);
 	}
 	return true;
 }
 
-bool OnTouch( const nuEvent& ev )
+bool OnTouch(const xoEvent& ev)
 {
-	nuDomEl* big = (nuDomEl*) ev.Context;
-	nuDoc* doc = big->GetDoc();
+	OnTimer(ev);
 
-	nuStyle style = big->GetStyle();
-	nuStyleAttrib bgimage;
-	//bgimage.SetBackgroundImage( nuImageStore::NullImageName, doc );
-	bgimage.SetBackgroundImage( "myimage", doc );
-
-	style.Set( bgimage );
-	big->HackSetStyle( style );
+	/*
+	xoDomNode* big = (xoDomNode*) ev.Context;
+	xoDoc* doc = big->GetDoc();
+	
+	xoStyle style = big->GetStyle();
+	xoStyleAttrib bgimage;
+	//bgimage.SetBackgroundImage( xoImageStore::NullImageName, doc );
+	bgimage.SetBackgroundImage("myimage", doc);
+	
+	style.Set(bgimage);
+	big->HackSetStyle(style);
+	*/
 	return true;
 }
 
