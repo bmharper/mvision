@@ -9,6 +9,7 @@ static int				Entropy2;
 static Tracker*			Track;
 static xoDomNode*		TrackDiv;
 static xoInternalID		CanvasID;
+static ccv_rect_t		TrackBox;
 
 static bool OnTouch( const xoEvent& ev );
 static bool OnTimer( const xoEvent& ev );
@@ -22,6 +23,8 @@ void xoMain(xoMainEvent ev)
 	{
 		MainWnd = xoSysWnd::CreateWithDoc();
 		xoDoc* doc = MainWnd->Doc();
+
+		TrackBox = ccv_rect(250, 190, 120, 190);
 
 		//xoDomNode* big = doc->Root.AddNode(xoTagDiv);
 		//big->StyleParse("width: 640px; height: 480px;");
@@ -66,22 +69,21 @@ void xoMain(xoMainEvent ev)
 	}
 }
 
-static void AddToTracker( int width, int height, void* rgb24 )
+static void StartTracker(int width, int height, void* rgb24, ccv_rect_t box)
 {
-	ccv_rect_t box = ccv_rect(160, 200, 160, 200);
-	if ( !Track )
-	{
-		Track = new Tracker();
-		Track->Initialize( width, height, rgb24, box );
-	}
-	else
-	{
-		ccv_comp_t newbox;
-		ccv_tld_info_t info;
-		Track->Track( rgb24, newbox, info );
-		box = newbox.rect;
-	}
-	TrackDiv->StyleParsef( "left: %dpx; top: %dpx; width: %dpx; height: %dpx;", box.x, box.y, box.width, box.height );
+	if (Track)
+		delete Track;
+
+	Track = new Tracker();
+	Track->Initialize(width, height, rgb24, box);
+}
+
+static ccv_rect_t AddToTracker(int width, int height, void* rgb24)
+{
+	ccv_comp_t box;
+	ccv_tld_info_t info;
+	Track->Track(rgb24, box, info);
+	return box.rect;
 }
 
 bool OnTimer(const xoEvent& ev)
@@ -113,41 +115,17 @@ bool OnTimer(const xoEvent& ev)
 				//lineOut += width;
 			}
 			//img->Set(xoTexFormatRGBA8, width, height, buf);
-			//AddToTracker(width, height, cameraFrame);
+			if (!Track)
+				StartTracker(width, height, cameraFrame, TrackBox);
+			else
+				TrackBox = AddToTracker(width, height, cameraFrame);
 			//free(buf);
 			c2d->Invalidate();
+			c2d->StrokeRect(xoBox(TrackBox.x, TrackBox.y, TrackBox.x + TrackBox.width, TrackBox.y + TrackBox.height), xoColor::RGBA(200, 0, 0, 200), 1);
 			canvas->ReleaseCanvas(c2d);
 			free(cameraFrame);
 			//doc->Images.Set("myimage", img);
 		}
-	}
-	else
-	{
-		const int width = 64;
-		const int height = 48;
-		xoImage* img = new xoImage();
-		size_t bsize = width * height * 4;
-		uint32* buf = (uint32*) malloc(bsize);
-		xoRGBA c;
-		c.r = (uint8) (Entropy1 >> 1);
-		c.g = (uint8) (Entropy2 >> 2);
-		c.b = 0;
-		c.a = 255;
-		Entropy1++;
-		Entropy2++;
-		for (int y = 0; y < height; y++)
-		{
-			uint32* line = buf + y * width;
-			for (int x = 0; x < width; x++)
-			{
-				c.r++;
-				c.g++;
-				line[x] = c.u;
-			}
-		}
-		img->Set(xoTexFormatRGBA8, width, height, buf);
-		free(buf);
-		doc->Images.Set("myimage", img);
 	}
 	return true;
 }
