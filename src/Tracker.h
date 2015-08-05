@@ -3,6 +3,8 @@
 class Tracker
 {
 public:
+	// Scale down image before processing by 2x, 4x, 8x, (must be a power of 2)
+	int						Scale = 2;
 
 	Tracker();
 	~Tracker();
@@ -10,13 +12,10 @@ public:
 	void					Track(void* data, ccv_comp_t& newbox, ccv_tld_info_t& info);
 
 private:
-	int64					MatrixSig;
-	int						Width;
-	int						Height;
-	ccv_dense_matrix_t		Matrix;
-	ccv_tld_t*				TLD;
+	int						Width = 0;
+	int						Height = 0;
+	ccv_dense_matrix_t*		PrevMatrix = nullptr;
+	ccv_tld_t*				TLD = nullptr;
 
-	void*					Half_RGB24_to_Lum8(int width, int height, void* data);
-	void*					RGB24_to_Lum8(int width, int height, void* data);
-	void*					Half_Lum8(int width, int height, void* data);
+	ccv_dense_matrix_t*		RGB24_to_Lum8_Scaled(int width, int height, void* data);
 };
