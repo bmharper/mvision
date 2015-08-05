@@ -7,12 +7,19 @@ static CaptureDevice*	Camera;
 static int				Entropy1;
 static int				Entropy2;
 static Tracker*			Track;
-static xoDomNode*		TrackDiv;
 static xoInternalID		CanvasID;
-static ccv_rect_t		TrackBox;
 
-static bool OnTouch( const xoEvent& ev );
-static bool OnTimer( const xoEvent& ev );
+struct UIState_t
+{
+	bool		IsDragging = false;
+	bool		StartTrack = false;
+	ccv_rect_t	TrackBox;
+} UIState;
+
+static bool OnMouseMove(const xoEvent& ev);
+static bool OnMouseDown(const xoEvent& ev);
+static bool OnMouseUp(const xoEvent& ev);
+static bool OnTimer(const xoEvent& ev);
 static void InitializeCamera();
 
 void xoMain(xoMainEvent ev)
@@ -24,8 +31,6 @@ void xoMain(xoMainEvent ev)
 		MainWnd = xoSysWnd::CreateWithDoc();
 		xoDoc* doc = MainWnd->Doc();
 
-		TrackBox = ccv_rect(250, 190, 120, 190);
-
 		//xoDomNode* big = doc->Root.AddNode(xoTagDiv);
 		//big->StyleParse("width: 640px; height: 480px;");
 		//big->StyleParse("background: #ffaf");
@@ -36,19 +41,33 @@ void xoMain(xoMainEvent ev)
 		canvas->StyleParse("background: #ffaf");
 		CanvasID = canvas->GetInternalID();
 
-		//TrackDiv = big->AddNode(xoTagDiv);
-		//TrackDiv->StyleParse("width: 30px; height: 30px; display: inline; position: absolute; left: 5px; top: 5px;");
-		//TrackDiv->StyleParse("background: #0a0a");
-
 		//xoStyle style = big->GetStyle();
 		//xoStyleAttrib bgimage;
 		//bgimage.SetBackgroundImage("NULL", doc);
 		//style.Set(bgimage);
 		//big->HackSetStyle(style);
 
-		doc->Root.OnMouseMove(OnTouch, canvas);
-		doc->Root.OnTouch(OnTouch, canvas);
-		doc->Root.OnTimer(OnTimer, canvas);
+		doc->Root.OnMouseMove([doc](const xoEvent& ev) -> bool {
+			UIState.TrackBox.width = (int) (ev.Points[0].x - UIState.TrackBox.x);
+			UIState.TrackBox.height = (int) (ev.Points[0].y - UIState.TrackBox.y);
+			return true;
+		});
+		doc->Root.OnMouseDown([](const xoEvent& ev) -> bool {
+			delete Track;
+			Track = nullptr;
+			UIState.TrackBox.x = (int) ev.Points[0].x;
+			UIState.TrackBox.y = (int) ev.Points[0].y;
+			UIState.IsDragging = true;
+			return true;
+		});
+		doc->Root.OnMouseUp([](const xoEvent& ev) -> bool {
+			UIState.TrackBox.width = (int) (ev.Points[0].x - UIState.TrackBox.x);
+			UIState.TrackBox.height = (int) (ev.Points[0].y - UIState.TrackBox.y);
+			UIState.IsDragging = false;
+			UIState.StartTrack = true;
+			return true;
+		});
+		doc->Root.OnTimer(OnTimer, canvas, 15);
 
 		MainWnd->Show();
 
@@ -71,9 +90,7 @@ void xoMain(xoMainEvent ev)
 
 static void StartTracker(int width, int height, void* rgb24, ccv_rect_t box)
 {
-	if (Track)
-		delete Track;
-
+	delete Track;
 	Track = new Tracker();
 	Track->Initialize(width, height, rgb24, box);
 }
@@ -115,37 +132,23 @@ bool OnTimer(const xoEvent& ev)
 				//lineOut += width;
 			}
 			//img->Set(xoTexFormatRGBA8, width, height, buf);
-			if (!Track)
-				StartTracker(width, height, cameraFrame, TrackBox);
-			else
-				TrackBox = AddToTracker(width, height, cameraFrame);
+			auto *tbox = &UIState.TrackBox;
+			if (UIState.StartTrack)
+			{
+				UIState.StartTrack = false;
+				StartTracker(width, height, cameraFrame, *tbox);
+			}
+			else if (Track)
+				*tbox = AddToTracker(width, height, cameraFrame);
 			//free(buf);
 			c2d->Invalidate();
-			c2d->StrokeRect(xoBox(TrackBox.x, TrackBox.y, TrackBox.x + TrackBox.width, TrackBox.y + TrackBox.height), xoColor::RGBA(200, 0, 0, 200), 1);
+			if (UIState.IsDragging || Track)
+				c2d->StrokeRect(xoBox(tbox->x, tbox->y, tbox->x + tbox->width, tbox->y + tbox->height), xoColor::RGBA(200, 0, 0, 200), 1);
 			canvas->ReleaseCanvas(c2d);
 			free(cameraFrame);
 			//doc->Images.Set("myimage", img);
 		}
 	}
-	return true;
-}
-
-bool OnTouch(const xoEvent& ev)
-{
-	OnTimer(ev);
-
-	/*
-	xoDomNode* big = (xoDomNode*) ev.Context;
-	xoDoc* doc = big->GetDoc();
-	
-	xoStyle style = big->GetStyle();
-	xoStyleAttrib bgimage;
-	//bgimage.SetBackgroundImage( xoImageStore::NullImageName, doc );
-	bgimage.SetBackgroundImage("myimage", doc);
-	
-	style.Set(bgimage);
-	big->HackSetStyle(style);
-	*/
 	return true;
 }
 

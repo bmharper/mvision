@@ -128,11 +128,24 @@ void CaptureDevice::Close()
 
 bool CaptureDevice::InitializeFirst( std::string& error )
 {
+	HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+	if (!SUCCEEDED(hr))
+	{
+		return false;
+		error = "CoInitializeEx failed";
+	}
+
+	hr = MFStartup(MF_VERSION, MFSTARTUP_FULL);
+	if (!SUCCEEDED(hr))
+	{
+		error = "MFStartup failed";
+		return false;
+	}
+
 	Close();
 
 	memset( &InputType, 0, sizeof(InputType) );
 
-	HRESULT hr = S_OK;
 	IMFActivate* activate = CaptureDevice::ChooseFirst( error );	
 	if ( !activate )
 		return false;
