@@ -41,7 +41,7 @@ ccv_dense_matrix_t* Tracker::RGB24_to_Lum8_Scaled(int width, int height, void* d
 	ccv_dense_matrix_t* mat = Util_RGB_to_CCV_Lum8(width, height, data);
 	for (int scale = Scale; scale != 1; scale /= 2)
 	{
-		ccv_dense_matrix_t* next = Util_Lum_HalfSize_Cheap(mat);
+		ccv_dense_matrix_t* next = Util_Lum_HalfSize_Box(mat, false);
 		ccv_matrix_free(mat);
 		mat = next;
 	}

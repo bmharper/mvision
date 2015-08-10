@@ -5,10 +5,19 @@
 #include "Common.h"
 
 // Modules
+struct Module
+{
+	void (*Start)(xoDoc* doc);
+	void (*End)();
+};
 void TLD_Start(xoDoc* doc);
 void TLD_End();
 void Motion_Start(xoDoc* doc);
 void Motion_End();
+static Module M_TLD = { TLD_Start, TLD_End };
+static Module M_Motion = { Motion_Start, Motion_End };
+//static Module *Mod = &M_TLD;
+static Module *Mod = &M_Motion;
 
 // Helpers
 static void InitializeCamera();
@@ -20,15 +29,13 @@ void xoMain(xoMainEvent ev)
 	case xoMainEventInit:
 		Global.MainWnd = xoSysWnd::CreateWithDoc();
 		
-		TLD_Start(Global.MainWnd->Doc());
-		//Motion_Start(Global.MainWnd->Doc());
+		Mod->Start(Global.MainWnd->Doc());
 
 		Global.MainWnd->Show();
 		InitializeCamera();
 		break;
 	case xoMainEventShutdown:
-		TLD_End();
-		//Motion_End();
+		Mod->End();
 		if (Global.Camera)
 			Global.Camera->Close();
 		SafeRelease(&Global.Camera);

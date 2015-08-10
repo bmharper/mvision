@@ -26,14 +26,27 @@ void Util_CameraToCanvas(CaptureDevice* camera, const void* cameraFrame, xoCanva
 	ccx->Invalidate();
 }
 
-void Util_LumToCanvas(ccv_dense_matrix_t* lum, xoCanvas2D* ccx)
+void Util_LumToCanvas(ccv_dense_matrix_t* lum, xoCanvas2D* ccx, int canvasX, int canvasY)
 {
 	for (int y = 0; y < lum->rows; y++)
 	{
-		uint32* lineOut = (uint32*) ccx->RowPtr(y);
-		uint8* in = lum->data.u8 + y * lum->step;
-		for (int x = 0; x < lum->cols; x++, in++)
-			lineOut[x] = xoRGBA::RGBA(*in, *in, *in, 255).u;
+		uint32* lineOut = (uint32*) ccx->RowPtr(y + canvasY);
+		if (CCV_GET_DATA_TYPE(lum->type) == CCV_8U)
+		{
+			uint8* in = lum->data.u8 + y * lum->step;
+			for (int x = 0; x < lum->cols; x++, in++)
+				lineOut[x + canvasX] = xoRGBA::RGBA(*in, *in, *in, 255).u;
+		}
+		else if (CCV_GET_DATA_TYPE(lum->type) == CCV_32F)
+		{
+
+			float* in = (float*) (lum->data.u8 + y * lum->step);
+			for (int x = 0; x < lum->cols; x++, in++)
+			{
+				uint8 v = *in * 255.0f;
+				lineOut[x + canvasX] = xoRGBA::RGBA(v, v, v, 255).u;
+			}
+		}
 	}
 	ccx->Invalidate();
 }
@@ -57,7 +70,7 @@ void Util_RGB_to_Lum(int width, int height, const void* rgb, ccv_dense_matrix_t*
 }
 
 template<bool sRGB>
-ccv_dense_matrix_t* Util_Lum_HalfSize_Cheap_T(ccv_dense_matrix_t* lum)
+ccv_dense_matrix_t* Util_Lum_HalfSize_Box_T(ccv_dense_matrix_t* lum)
 {
 	assert((lum->cols & 1) == 0 && (lum->rows & 1) == 0);
 
@@ -90,13 +103,62 @@ ccv_dense_matrix_t* Util_Lum_HalfSize_Cheap_T(ccv_dense_matrix_t* lum)
 	return half;
 }
 
-ccv_dense_matrix_t* Util_Lum_HalfSize_Cheap(ccv_dense_matrix_t* lum)
+ccv_dense_matrix_t* Util_Lum_HalfSize_Box(ccv_dense_matrix_t* lum, bool sRGB)
 {
-	return Util_Lum_HalfSize_Cheap_T<false>(lum);
+	if (sRGB)
+		return Util_Lum_HalfSize_Box_T<true>(lum);
+	else
+		return Util_Lum_HalfSize_Box_T<false>(lum);
 }
 
-ccv_dense_matrix_t* Util_Lum_HalfSize_Cheap_Linear(ccv_dense_matrix_t* lum)
+ccv_dense_matrix_t* Util_Lum_HalfSize_Box_Until(ccv_dense_matrix_t* lum, bool sRGB, int widthLessThanOrEqualTo)
 {
-	return Util_Lum_HalfSize_Cheap_T<true>(lum);
+	assert(lum->cols > widthLessThanOrEqualTo);
+
+	ccv_dense_matrix_t* image = lum;
+	while (image->cols > widthLessThanOrEqualTo)
+	{
+		ccv_dense_matrix_t* next = Util_Lum_HalfSize_Box(image, sRGB);
+		if (image != lum)
+			ccv_matrix_free(image);
+		image = next;
+	}
+	return image;
 }
 
+ccv_dense_matrix_t* Util_Clone(ccv_dense_matrix_t* org, int targetType)
+{
+	if (targetType == 0 || targetType == CCV_GET_DATA_TYPE(org->type))
+	{
+		ccv_dense_matrix_t* copy = ccv_dense_matrix_new(org->rows, org->cols, org->type, nullptr, org->sig);
+		size_t dataSize = ccv_compute_dense_matrix_size(org->rows, org->cols, org->type) - sizeof(ccv_dense_matrix_t);
+		memcpy(copy->data.u8, org->data.u8, dataSize);
+		return copy;
+	}
+	else
+	{
+		ccv_dense_matrix_t* copy = ccv_dense_matrix_new(org->rows, org->cols, targetType | CCV_GET_CHANNEL(org->type), nullptr, 0);
+		int npixels = org->rows * org->cols;
+		if (CCV_GET_DATA_TYPE(org->type) == CCV_8U && targetType == CCV_32F)
+		{
+			for (int i = 0; i < npixels; i++)
+				copy->data.f32[i] = (float) org->data.u8[i] / 255.0f;
+		}
+		else
+		{
+			assert(false);
+		}
+		return copy;
+	}
+}
+
+void Util_Copy(ccv_dense_matrix_t* dst, ccv_dense_matrix_t* src)
+{
+	assert(CCV_GET_CHANNEL(src->type) == CCV_GET_CHANNEL(dst->type));
+	assert(CCV_GET_DATA_TYPE(src->type) == CCV_GET_DATA_TYPE(dst->type));
+	assert(src->rows == dst->rows);
+	assert(src->cols == dst->cols);
+
+	size_t dataSize = ccv_compute_dense_matrix_size(src->rows, src->cols, src->type) - sizeof(ccv_dense_matrix_t);
+	memcpy(dst->data.u8, src->data.u8, dataSize);
+}

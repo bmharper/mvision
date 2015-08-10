@@ -31,4 +31,31 @@ Build {
 			},
 		},
 	},
+	IdeGenerationHints = {
+	--[[
+		Msvc = {
+			-- Remap config names to MSVC platform names (affects things like header scanning & debugging)
+			PlatformMappings = {
+				['win64-msvc2010'] = 'x64',
+				['win64-msvc2012'] = 'x64',
+				['win64-msvc2013'] = 'x64',
+				['win32-msvc2010'] = 'Win32',
+				['win32-msvc2012'] = 'Win32',
+				['win32-msvc2013'] = 'Win32',
+			},
+			-- Remap variant names to MSVC friendly names
+			VariantMappings = {
+				['release-default']    = 'Release',
+				['debug-default']      = 'Debug',
+				['release-analyze']    = 'Release Analyze',
+				['debug-analyze']      = 'Debug Analyze',
+			},
+		},
+		--]]
+		-- Override solutions to generate and what units to put where.
+		MsvcSolutions = {
+			['ccv.sln'] = {}, -- receives all the units due to empty set
+		},
+		BuildAllByDefault = true,
+	},
 }
