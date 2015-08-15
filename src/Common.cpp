@@ -26,25 +26,51 @@ void Util_CameraToCanvas(CaptureDevice* camera, const void* cameraFrame, xoCanva
 	ccx->Invalidate();
 }
 
-void Util_LumToCanvas(ccv_dense_matrix_t* lum, xoCanvas2D* ccx, int canvasX, int canvasY)
+template<int scale>
+void WriteLumPxToCanvas(uint32* out, uint8 v)
 {
-	for (int y = 0; y < lum->rows; y++)
+	uint32 px = xoRGBA::RGBA(v, v, v, 255).u;
+	out[0] = px;
+	if (scale >= 2)
 	{
-		uint32* lineOut = (uint32*) ccx->RowPtr(y + canvasY);
-		if (CCV_GET_DATA_TYPE(lum->type) == CCV_8U)
-		{
-			uint8* in = lum->data.u8 + y * lum->step;
-			for (int x = 0; x < lum->cols; x++, in++)
-				lineOut[x + canvasX] = xoRGBA::RGBA(*in, *in, *in, 255).u;
-		}
-		else if (CCV_GET_DATA_TYPE(lum->type) == CCV_32F)
-		{
+		out[1] = px;
+	}
+	if (scale == 4)
+	{
+		out[2] = px;
+		out[3] = px;
+	}
+}
 
-			float* in = (float*) (lum->data.u8 + y * lum->step);
-			for (int x = 0; x < lum->cols; x++, in++)
+void Util_LumToCanvas(ccv_dense_matrix_t* lum, xoCanvas2D* ccx, int canvasX, int canvasY, int scale)
+{
+	assert(canvasX + lum->cols * scale <= ccx->Width());
+	assert(canvasY + lum->rows * scale <= ccx->Height());
+	int outY = 0;
+	for (int y = 0; y < lum->rows; y++, outY += scale)
+	{
+		for (int lineRepeat = 0; lineRepeat < scale; lineRepeat++)
+		{
+			uint32* out = ((uint32*) ccx->RowPtr(outY + canvasY + lineRepeat)) + canvasX;
+			if (CCV_GET_DATA_TYPE(lum->type) == CCV_8U)
 			{
-				uint8 v = *in * 255.0f;
-				lineOut[x + canvasX] = xoRGBA::RGBA(v, v, v, 255).u;
+				uint8* in = lum->data.u8 + y * lum->step;
+				for (int x = 0; x < lum->cols; x++, out += scale)
+				{
+					if (scale == 1)			WriteLumPxToCanvas<1>(out, in[x]);
+					else if (scale == 2)	WriteLumPxToCanvas<2>(out, in[x]);
+					else if (scale == 4)	WriteLumPxToCanvas<4>(out, in[x]);
+				}
+			}
+			else if (CCV_GET_DATA_TYPE(lum->type) == CCV_32F)
+			{
+				float* in = (float*) (lum->data.u8 + y * lum->step);
+				for (int x = 0; x < lum->cols; x++, out += scale)
+				{
+					if (scale == 1)			WriteLumPxToCanvas<1>(out, (byte) (in[x] * 255.0f));
+					else if (scale == 2)	WriteLumPxToCanvas<2>(out, (byte) (in[x] * 255.0f));
+					else if (scale == 4)	WriteLumPxToCanvas<4>(out, (byte) (in[x] * 255.0f));
+				}
 			}
 		}
 	}

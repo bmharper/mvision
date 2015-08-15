@@ -152,6 +152,8 @@ local WebcamShow = Program {
 	Sources = {
 		"Common.cpp",
 		"Common.h",
+		"MotionDetect.cpp",
+		"MotionDetect.h",
 		"xoMain.cpp",
 		--"VideoCapture.cpp",
 		"WebcamShow.cpp",

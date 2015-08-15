@@ -16,7 +16,7 @@ struct Global_t
 LINKAGE Global_t Global;
 
 void					Util_CameraToCanvas(CaptureDevice* camera, const void* cameraFrame, xoCanvas2D* ccx);
-void					Util_LumToCanvas(ccv_dense_matrix_t* lum, xoCanvas2D* ccx, int canvasX = 0, int canvasY = 0);
+void					Util_LumToCanvas(ccv_dense_matrix_t* lum, xoCanvas2D* ccx, int canvasX = 0, int canvasY = 0, int scale = 1);
 ccv_dense_matrix_t*		Util_RGB_to_CCV_Lum8(int width, int height, const void* rgb);
 void					Util_RGB_to_Lum(int width, int height, const void* rgb, ccv_dense_matrix_t* lum);
 ccv_dense_matrix_t* 	Util_Lum_HalfSize_Box(ccv_dense_matrix_t* lum, bool sRGB);
