@@ -2,29 +2,28 @@
 #include "MotionDetect.h"
 #include "Common.h"
 
+namespace sx
+{
+
 MotionDetector::MotionDetector()
 {
 }
 
 MotionDetector::~MotionDetector()
 {
-	if (Prev)
-		ccv_matrix_free(Prev);
-	if (Stable)
-		ccv_matrix_free(Stable);
-	if (DebugImage)
-		ccv_matrix_free(DebugImage);
+	delete Prev;
+	delete Stable;
+	delete DebugImage;
 }
 
-void MotionDetector::Frame(ccv_dense_matrix_t* frame)
+void MotionDetector::Frame(Image* frame)
 {
-	assert(CCV_GET_DATA_TYPE(frame->type) == CCV_8U);
-	assert(CCV_GET_CHANNEL(frame->type) == CCV_C1);
+	assert(frame->Fmt == ImgFmt::Lum8u);
 
 	const int width = 20;
 
-	ccv_dense_matrix_t* myframe = frame;
-	if (frame->cols > width)
+	Image* myframe = frame;
+	if (frame->Width > width)
 		myframe = Util_Lum_HalfSize_Box_Until(frame, false, width);
 
 	if (Prev)
@@ -41,76 +40,92 @@ void MotionDetector::Frame(ccv_dense_matrix_t* frame)
 	MergeIntoPrev(myframe);
 
 	if (!Prev)
-		Prev = Util_Clone(myframe);
+		Prev = myframe->Clone();
 	else
-		Util_Copy(Prev, myframe);
+		myframe->CopyTo(Prev);
 
 	if (myframe != frame)
-		ccv_matrix_free(myframe);
+		delete myframe;
 
 	NFrames++;
 }
 
-float MotionDetector::ComputeNoise(ccv_dense_matrix_t* a, ccv_dense_matrix_t* b)
+float MotionDetector::ComputeNoise(Image* a, Image* b)
 {
 	// uber-simple: just treat the entire scene as noise.
+	assert(a->Width == b->Width && a->Height == b->Height && a->Fmt == b->Fmt && a->Fmt == ImgFmt::Lum8u);
 
 	uint32 sumDiff = 0;
-	int npixels = a->cols * a->rows;
-	for (int i = 0; i < npixels; i++)
-		sumDiff += AbsDiff(a->data.u8[i], b->data.u8[i]);
+	for (int y = 0; y < a->Height; y++)
+	{
+		int width = a->Width;
+		uint8* aline = a->RowPtr8u(y);
+		uint8* bline = b->RowPtr8u(y);
+		for (int x = 0; x < width; x++)
+			sumDiff += AbsDiff(aline[x], bline[x]);
+	}
 
-	return (float) sumDiff / (float) npixels;
+	return (float) sumDiff / (float) (a->Width * a->Height);
 }
 
-void MotionDetector::ComputePixelsInMotion(ccv_dense_matrix_t* frame)
+void MotionDetector::ComputePixelsInMotion(Image* frame)
 {
 	if (!DebugImage && OutputDebugImage)
-		DebugImage = Util_Clone(frame);
+		DebugImage = frame->Clone();
 
 	// minNoise and threshold are empirically tweaked
-	float minNoise  =  0.25f;
+	float minNoise = 0.25f;
 	float threshold = 16.0f;
 
 	float thresholdf32 = std::max(Noise, minNoise) * threshold / 255.0f;
-	int npixels = Stable->cols * Stable->rows;
 	int nmoving = 0;
-	for (int i = 0; i < npixels; i++)
+	for (int y = 0; y < frame->Height; y++)
 	{
-		float diff = fabs(Stable->data.f32[i] - (frame->data.u8[i] / 255.0f));
-		if (diff > thresholdf32)
+		float* lstable = Stable->RowPtr32f(y);
+		uint8* lframe = frame->RowPtr8u(y);
+		for (int i = 0; i < frame->Width; i++)
 		{
-			nmoving++;
-			if (OutputDebugImage)
-				DebugImage->data.u8[i] = 255;
-		}
-		else
-		{
-			if (OutputDebugImage)
-				DebugImage->data.u8[i] = 0;
+			float diff = fabs(lstable[i] - (lframe[i] / 255.0f));
+			if (diff > thresholdf32)
+			{
+				nmoving++;
+				if (OutputDebugImage)
+					DebugImage->RowPtr8u(y)[i] = 255;
+			}
+			else
+			{
+				if (OutputDebugImage)
+					DebugImage->RowPtr8u(y)[i] = 0;
+			}
 		}
 	}
 
 	IsMotion = nmoving >= 3;
 }
 
-void MotionDetector::MergeIntoPrev(ccv_dense_matrix_t* frame)
+void MotionDetector::MergeIntoPrev(Image* frame)
 {
 	if (!Stable)
-		Stable = Util_Clone(frame, CCV_32F);
+		Stable = frame->Clone(ImgFmt::Lum32f);
 
 	// Greater numbers cause a more "sticky" stable image
 	// Lower numbers would allow somebody to trick the system by moving vewwy vewwy slowly
 	const float stability = 100.0f;
 
-	int npixels = frame->cols * frame->rows;
-	for (int i = 0; i < npixels; i++)
+	for (int y = 0; y < Stable->Height; y++)
 	{
-		// It's hard to know how much to make this adjustment.
-		// It needs to be pretty slow to converge - otherwise you can fool the system
-		// by simply moving very slowly.
-		float a = stability * (float) Stable->data.f32[i];
-		float b = 1.0f / 255.0f * (float) frame->data.u8[i];
-		Stable->data.f32[i] = (a + b) / (stability + 1.0f);
+		float* lstable = Stable->RowPtr32f(y);
+		uint8* lframe = frame->RowPtr8u(y);
+		for (int x = 0; x < Stable->Width; x++)
+		{
+			// It's hard to know how much to make this adjustment.
+			// It needs to be pretty slow to converge - otherwise you can fool the system
+			// by simply moving very slowly.
+			float a = stability * lstable[x];
+			float b = 1.0f / 255.0f * (float) lframe[x];
+			lstable[x] = (a + b) / (stability + 1.0f);
+		}
 	}
+}
+
 }

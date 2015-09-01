@@ -2,6 +2,9 @@
 #include "Common.h"
 #include "MotionDetect.h"
 
+namespace sx
+{
+
 static struct Motion_t
 {
 	xoDomCanvas*	Canvas1;
@@ -21,24 +24,24 @@ static bool OnTimer(const xoEvent& ev)
 	auto cam = Global.Camera;
 	if (cam)
 	{
-		void* cameraFrame = cam->GetNextFrame();
+		Image* cameraFrame = cam->NextFrame();
 		if (cameraFrame)
 		{
 			auto c1 = Motion.Canvas1->GetCanvas2D();
-			Util_CameraToCanvas(cam, cameraFrame, c1);
+			Util_ImageToCanvas(cameraFrame, c1);
 			Motion.Canvas1->ReleaseCanvas(c1);
 
 			auto c2 = Motion.Canvas2->GetCanvas2D();
-			ccv_dense_matrix_t* lum = Util_RGB_to_CCV_Lum8(cam->GetWidth(), cam->GetHeight(), cameraFrame);
+			Image* lum = cameraFrame->Clone(ImgFmt::Lum8u);
 			Motion.Detector->Frame(lum);
 			if (Motion.Detector->Stable)
 				Util_LumToCanvas(Motion.Detector->Stable, c2, 0, 0, 4);
 			if (Motion.Detector->DebugImage)
 				Util_LumToCanvas(Motion.Detector->DebugImage, c2, 80, 0, 4);
-			ccv_matrix_free(lum);
+			delete lum;
 			Motion.Canvas2->ReleaseCanvas(c2);
 
-			free(cameraFrame);
+			delete cameraFrame;
 
 			UpdateStats();
 		}
@@ -68,4 +71,4 @@ void Motion_End()
 	delete Motion.Detector;
 }
 
-
+}

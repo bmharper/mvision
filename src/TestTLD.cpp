@@ -2,6 +2,8 @@
 #include "Common.h"
 #include "Tracker.h"
 
+#ifdef SX_CCV
+
 static struct TLD_t
 {
 	bool		IsDragging = false;
@@ -31,11 +33,11 @@ static bool OnTimer(const xoEvent& ev)
 
 	if (Global.Camera)
 	{
-		void* cameraFrame = Global.Camera->GetNextFrame();
+		void* cameraFrame = Global.Camera->NextFrame();
 		if (cameraFrame)
 		{
-			int width = Global.Camera->GetWidth();
-			int height = Global.Camera->GetHeight();
+			int width = Global.Camera->Width();
+			int height = Global.Camera->Height();
 			auto c2d = canvas->GetCanvas2D();
 
 			Util_CameraToCanvas(Global.Camera, cameraFrame, c2d);
@@ -92,3 +94,5 @@ void TLD_End()
 	delete TLD.Track;
 	TLD.Track = NULL;
 }
+
+#endif

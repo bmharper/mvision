@@ -32,6 +32,8 @@
 #include <ksmedia.h>
 #include <Dbt.h>
 
+#include <chrono>
+
 template <class T> void SafeRelease(T **ppT)
 {
     if (*ppT)

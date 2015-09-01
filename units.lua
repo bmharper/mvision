@@ -6,7 +6,7 @@ local function ccv_path(config, file)
 end
 
 local function xo_path(config, file)
-	return "../xo/t2-output/win64-msvc2013-" .. config .. "-default/" .. file
+	return "../xo/t2-output/win64-msvc2015-" .. config .. "-default/" .. file
 end
 
 local winKernelLibs = { "kernel32.lib", "user32.lib", "gdi32.lib", "winspool.lib", "advapi32.lib", "shell32.lib", "comctl32.lib", 
@@ -73,6 +73,81 @@ local crtStatic = ExternalLibrary {
 }
 
 local crt = crtDynamic
+
+-- I'm giving up on libccv until I can get it compiling natively on Windows.
+-- I don't know when or why it happened, but at some point I just started 
+-- getting exceptions inside any call to libccv, when I was compiling it
+-- with mingw (TDM package of GCC 5.1.0).
+--[[
+local ccv = SharedLibrary {
+	Name = "ccv",
+	Libs = { "ws2_32", },
+	SourceDir = "third_party/ccv/",
+	Sources = {
+		-- Glob { Dir = "ccv/lib", Extensions = { ".c", ".h" }, },
+		--"lib/ccv.h-$(CXXOPTS_$(CURRENT_VARIANTX:u))",
+		"lib/ccv.h",
+		"lib/ccv_algebra.c",
+		"lib/ccv_basic.c",
+		"lib/ccv_bbf.c",
+		"lib/ccv_cache.c",
+		"lib/ccv_classic.c",
+		"lib/ccv_daisy.c",
+		"lib/ccv_dpm.c",
+		"lib/ccv_ferns.c",
+		"lib/ccv_internal.h",
+		"lib/ccv_io.c",
+		"lib/ccv_memory.c",
+		"lib/ccv_mser.c",
+		"lib/ccv_numeric.c",
+		"lib/ccv_resample.c",
+		"lib/ccv_sift.c",
+		"lib/ccv_sparse_coding.c",
+		"lib/ccv_swt.c",
+		"lib/ccv_tld.c",
+		"lib/ccv_transform.c",
+		"lib/ccv_util.c",
+		"lib/3rdparty/dsfmt/dSFMT.c",
+		"lib/3rdparty/dsfmt/dSFMT.h",
+		"lib/3rdparty/dsfmt/dSFMT-common.h",
+		"lib/3rdparty/dsfmt/dSFMT-params.h",
+		"lib/3rdparty/dsfmt/dSFMT-params19937.h",
+		"lib/3rdparty/kissfft/_kiss_fft_guts.h",
+		"lib/3rdparty/kissfft/_kissf_fft_guts.h",
+		"lib/3rdparty/kissfft/kiss_fft.c",
+		"lib/3rdparty/kissfft/kiss_fft.h",
+		"lib/3rdparty/kissfft/kiss_fftnd.c",
+		"lib/3rdparty/kissfft/kiss_fftnd.h",
+		"lib/3rdparty/kissfft/kiss_fftndr.c",
+		"lib/3rdparty/kissfft/kiss_fftndr.h",
+		"lib/3rdparty/kissfft/kiss_fftr.c",
+		"lib/3rdparty/kissfft/kiss_fftr.h",
+		"lib/3rdparty/kissfft/kissf_fft.c",
+		"lib/3rdparty/kissfft/kissf_fft.h",
+		"lib/3rdparty/kissfft/kissf_fftnd.c",
+		"lib/3rdparty/kissfft/kissf_fftnd.h",
+		"lib/3rdparty/kissfft/kissf_fftndr.c",
+		"lib/3rdparty/kissfft/kissf_fftndr.h",
+		"lib/3rdparty/kissfft/kissf_fftr.c",
+		"lib/3rdparty/kissfft/kissf_fftr.h",
+		"lib/3rdparty/sfmt/SFMT.c",
+		"lib/3rdparty/sfmt/SFMT.h",
+		"lib/3rdparty/sfmt/SFMT-alti.h",
+		"lib/3rdparty/sfmt/SFMT-common.h",
+		"lib/3rdparty/sfmt/SFMT-params.h",
+		"lib/3rdparty/sfmt/SFMT-params19937.h",
+		"lib/3rdparty/sfmt/SFMT-sse2.h",
+		"lib/3rdparty/sha1/sha1.c",
+		"lib/3rdparty/sha1/sha1.h",
+		--"lib/io/_ccv_io_binary.c",
+		--"lib/io/_ccv_io_bmp.c",
+		--"lib/io/_ccv_io_libjpeg.c",
+		--"lib/io/_ccv_io_libpng.c",
+		--"lib/io/_ccv_io_raw.c",
+	},
+}
+--]]
+
 
 local xo_use_amalgamation = false
 local xo, xo_env
@@ -141,8 +216,12 @@ local WebcamShow = Program {
 			{ ccv_path("debug", "");   Config = "win64-*-debug-default" },
 			{ ccv_path("release", ""); Config = "win64-*-release-default" },
 		},
+		-- PROGOPTS = {
+		-- 	"/DELAYLOAD:libccv.dll"; Config = "win*", 
+		-- },
 	},
-	Libs = { "mfplat.lib", "mf.lib", "mfreadwrite.lib", "mfuuid.lib", "d3d9.lib", "shlwapi.lib", "user32.lib", "ole32.lib", "libccv.lib", "opengl32.lib", "user32.lib", "gdi32.lib", },
+	Libs = { "mfplat.lib", "mf.lib", "mfreadwrite.lib", "mfuuid.lib", "d3d9.lib", "shlwapi.lib", "user32.lib", "ole32.lib", "opengl32.lib", "user32.lib", "gdi32.lib" },
+	-- Libs = { "libccv.lib", "Delayimp.lib" }
 	Includes = { "src/", "../", ".", }, -- the ../ is for /xo/...
 	PrecompiledHeader = {
 		Source = "src/pch.cpp",
@@ -160,15 +239,21 @@ local WebcamShow = Program {
 		"Tracker.cpp",
 		"Tracker.h",
 		"TestMotion.cpp",
+		"TestSIFT.cpp",
 		"TestTLD.cpp",
-		"win_capture/BufferLock.h",
-		"win_capture/capture_device.cpp",
-		"win_capture/capture_device.h",
-		"win_capture/device.cpp",
-		"win_capture/device.h",
-		"win_capture/MFCaptureD3D.h",
-		"win_capture/preview.cpp",
-		"win_capture/preview.h",
+		"cameras/Cameras.h",
+		"cameras/MJPEG.cpp",
+		"cameras/MJPEG.h",
+		"cameras/win_capture/BufferLock.h",
+		"cameras/win_capture/capture_device.cpp",
+		"cameras/win_capture/capture_device.h",
+		"cameras/win_capture/device.cpp",
+		"cameras/win_capture/device.h",
+		"cameras/win_capture/MFCaptureD3D.h",
+		"cameras/win_capture/preview.cpp",
+		"cameras/win_capture/preview.h",
+		"image/image.cpp",
+		"image/image.h",
 	},
 }
 
@@ -178,11 +263,12 @@ local WebcamShow = Program {
 -- Copy a file that is the same across all configurations
 --local copy_2 = CopyFileInvariant { Source = 'a', Target = 'b' }
 
-local copy_libccv = CopyFile {
-	Source = ccv_path("$(CURRENT_VARIANT)", "libccv.dll"),
-	Target = '$(OBJECTDIR)/libccv.dll'
-}
-Default(copy_libccv)
+-- This was used when building libccv via an external project that uses mingw toolchain
+-- local copy_libccv = CopyFile {
+-- 	Source = ccv_path("$(CURRENT_VARIANT)", "libccv.dll"),
+-- 	Target = '$(OBJECTDIR)/libccv.dll'
+-- }
+-- Default(copy_libccv)
 
 --local playcap = Program {
 --	Name = "playcap",

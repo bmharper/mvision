@@ -2,6 +2,8 @@
 #include "Common.h"
 #include "Tracker.h"
 
+#ifdef SX_CCV
+
 Tracker::Tracker()
 {
 }
@@ -47,3 +49,5 @@ ccv_dense_matrix_t* Tracker::RGB24_to_Lum8_Scaled(int width, int height, void* d
 	}
 	return mat;
 }
+
+#endif

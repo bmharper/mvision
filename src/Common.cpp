@@ -1,6 +1,9 @@
 #include "pch.h"
 #include "Common.h"
 
+namespace sx
+{
+
 // Use 'div.exe' by AMD to calculate these things. Valid ranges are up to 32k or 64k, I'm not sure.
 inline uint32 DivideByThree(uint32 i)
 {
@@ -8,20 +11,18 @@ inline uint32 DivideByThree(uint32 i)
 	return i >> 17;
 }
 
-void Util_CameraToCanvas(CaptureDevice* camera, const void* cameraFrame, xoCanvas2D* ccx)
+void Util_ImageToCanvas(const Image* img, xoCanvas2D* ccx)
 {
-	// Assume camera is RGB. Canvas is BGRA
-	int width = camera->GetWidth();
-	int height = camera->GetHeight();
-	
-	uint8* lineIn = (uint8*) cameraFrame;
-	for (int y = 0; y < height; y++)
+	assert(img->Fmt == ImgFmt::RGB8u);
+
+	for (int y = 0; y < img->Height; y++)
 	{
+		uint8* lineIn = (uint8*) img->RowPtr(y);
 		uint32* lineOut = (uint32*) ccx->RowPtr(y);
 		uint8* in = lineIn;
+		int width = img->Width;
 		for (int x = 0; x < width; x++, in += 3)
 			lineOut[x] = xoRGBA::RGBA(in[2], in[1], in[0], 255).u;
-		lineIn += width * 3;
 	}
 	ccx->Invalidate();
 }
@@ -42,30 +43,30 @@ void WriteLumPxToCanvas(uint32* out, uint8 v)
 	}
 }
 
-void Util_LumToCanvas(ccv_dense_matrix_t* lum, xoCanvas2D* ccx, int canvasX, int canvasY, int scale)
+void Util_LumToCanvas(const Image* lum, xoCanvas2D* ccx, int canvasX, int canvasY, int scale)
 {
-	assert(canvasX + lum->cols * scale <= ccx->Width());
-	assert(canvasY + lum->rows * scale <= ccx->Height());
+	assert(canvasX + lum->Width * scale <= ccx->Width());
+	assert(canvasY + lum->Height * scale <= ccx->Height());
 	int outY = 0;
-	for (int y = 0; y < lum->rows; y++, outY += scale)
+	for (int y = 0; y < lum->Height; y++, outY += scale)
 	{
 		for (int lineRepeat = 0; lineRepeat < scale; lineRepeat++)
 		{
 			uint32* out = ((uint32*) ccx->RowPtr(outY + canvasY + lineRepeat)) + canvasX;
-			if (CCV_GET_DATA_TYPE(lum->type) == CCV_8U)
+			if (lum->Fmt == ImgFmt::Lum8u)
 			{
-				uint8* in = lum->data.u8 + y * lum->step;
-				for (int x = 0; x < lum->cols; x++, out += scale)
+				uint8* in = (uint8*) lum->RowPtr(y);
+				for (int x = 0; x < lum->Width; x++, out += scale)
 				{
 					if (scale == 1)			WriteLumPxToCanvas<1>(out, in[x]);
 					else if (scale == 2)	WriteLumPxToCanvas<2>(out, in[x]);
 					else if (scale == 4)	WriteLumPxToCanvas<4>(out, in[x]);
 				}
 			}
-			else if (CCV_GET_DATA_TYPE(lum->type) == CCV_32F)
+			else if (lum->Fmt == ImgFmt::Lum32f)
 			{
-				float* in = (float*) (lum->data.u8 + y * lum->step);
-				for (int x = 0; x < lum->cols; x++, out += scale)
+				float* in = (float*) lum->RowPtr(y);
+				for (int x = 0; x < lum->Width; x++, out += scale)
 				{
 					if (scale == 1)			WriteLumPxToCanvas<1>(out, (byte) (in[x] * 255.0f));
 					else if (scale == 2)	WriteLumPxToCanvas<2>(out, (byte) (in[x] * 255.0f));
@@ -77,38 +78,25 @@ void Util_LumToCanvas(ccv_dense_matrix_t* lum, xoCanvas2D* ccx, int canvasX, int
 	ccx->Invalidate();
 }
 
-ccv_dense_matrix_t* Util_RGB_to_CCV_Lum8(int width, int height, const void* rgb)
-{
-	ccv_dense_matrix_t* lum = ccv_dense_matrix_new(height, width, CCV_8U | CCV_C1, nullptr, 0);
-	Util_RGB_to_Lum(width, height, rgb, lum);
-	return lum;
-}
-
-void Util_RGB_to_Lum(int width, int height, const void* rgb, ccv_dense_matrix_t* lum)
-{
-	for (int y = 0; y < height; y++)
-	{
-		uint8* srcLine = ((uint8*) rgb) + y * width * 3;
-		uint8* dstLine = lum->data.u8 + y * lum->step;
-		for (int x = 0, x3 = 0; x < width; x++, x3 += 3)
-			dstLine[x] = DivideByThree(srcLine[x3] + srcLine[x3 + 1] + srcLine[x3 + 2]);
-	}
-}
-
 template<bool sRGB>
-ccv_dense_matrix_t* Util_Lum_HalfSize_Box_T(ccv_dense_matrix_t* lum)
+Image* Util_Lum_HalfSize_Box_T(Image* lum)
 {
-	assert((lum->cols & 1) == 0 && (lum->rows & 1) == 0);
+	assert((lum->Width & 1) == 0 && (lum->Height & 1) == 0);
 
-	ccv_dense_matrix_t* half = ccv_dense_matrix_new(lum->rows / 2, lum->cols / 2, CCV_8U | CCV_C1, nullptr, 0);
+	Image* half = new Image();
+	if (!half->Alloc(lum->Fmt, lum->Width / 2, lum->Height / 2))
+	{
+		delete half;
+		return nullptr;
+	}
 
-	int nwidth = lum->cols / 2;
-	int nheight = lum->rows / 2;
+	int nwidth = lum->Width / 2;
+	int nheight = lum->Height / 2;
 	for (int y = 0; y < nheight; y++)
 	{
-		uint8* srcLine1 = lum->data.u8 + (y << 1) * lum->step;
-		uint8* srcLine2 = lum->data.u8 + ((y << 1) + 1) * lum->step;
-		uint8* dstLine = half->data.u8 + y * half->step;
+		uint8* srcLine1 = (uint8*) lum->RowPtr(y * 2);
+		uint8* srcLine2 = (uint8*) lum->RowPtr(y * 2 + 1);
+		uint8* dstLine = (uint8*) half->RowPtr(y);
 		int x2 = 0;
 		for (int x = 0; x < nwidth; x++, x2 += 2)
 		{
@@ -129,7 +117,7 @@ ccv_dense_matrix_t* Util_Lum_HalfSize_Box_T(ccv_dense_matrix_t* lum)
 	return half;
 }
 
-ccv_dense_matrix_t* Util_Lum_HalfSize_Box(ccv_dense_matrix_t* lum, bool sRGB)
+Image* Util_Lum_HalfSize_Box(Image* lum, bool sRGB)
 {
 	if (sRGB)
 		return Util_Lum_HalfSize_Box_T<true>(lum);
@@ -137,54 +125,41 @@ ccv_dense_matrix_t* Util_Lum_HalfSize_Box(ccv_dense_matrix_t* lum, bool sRGB)
 		return Util_Lum_HalfSize_Box_T<false>(lum);
 }
 
-ccv_dense_matrix_t* Util_Lum_HalfSize_Box_Until(ccv_dense_matrix_t* lum, bool sRGB, int widthLessThanOrEqualTo)
+Image* Util_Lum_HalfSize_Box_Until(Image* lum, bool sRGB, int widthLessThanOrEqualTo)
 {
-	assert(lum->cols > widthLessThanOrEqualTo);
+	assert(lum->Width > widthLessThanOrEqualTo);
 
-	ccv_dense_matrix_t* image = lum;
-	while (image->cols > widthLessThanOrEqualTo)
+	Image* image = lum;
+	while (image->Width > widthLessThanOrEqualTo)
 	{
-		ccv_dense_matrix_t* next = Util_Lum_HalfSize_Box(image, sRGB);
+		Image* next = Util_Lum_HalfSize_Box(image, sRGB);
 		if (image != lum)
-			ccv_matrix_free(image);
+			delete image;
 		image = next;
 	}
 	return image;
 }
 
-ccv_dense_matrix_t* Util_Clone(ccv_dense_matrix_t* org, int targetType)
+/*
+void Util_RGB_to_Lum(int width, int height, const void* rgb, Image* lum)
 {
-	if (targetType == 0 || targetType == CCV_GET_DATA_TYPE(org->type))
+	for (int y = 0; y < height; y++)
 	{
-		ccv_dense_matrix_t* copy = ccv_dense_matrix_new(org->rows, org->cols, org->type, nullptr, org->sig);
-		size_t dataSize = ccv_compute_dense_matrix_size(org->rows, org->cols, org->type) - sizeof(ccv_dense_matrix_t);
-		memcpy(copy->data.u8, org->data.u8, dataSize);
-		return copy;
-	}
-	else
-	{
-		ccv_dense_matrix_t* copy = ccv_dense_matrix_new(org->rows, org->cols, targetType | CCV_GET_CHANNEL(org->type), nullptr, 0);
-		int npixels = org->rows * org->cols;
-		if (CCV_GET_DATA_TYPE(org->type) == CCV_8U && targetType == CCV_32F)
-		{
-			for (int i = 0; i < npixels; i++)
-				copy->data.f32[i] = (float) org->data.u8[i] / 255.0f;
-		}
-		else
-		{
-			assert(false);
-		}
-		return copy;
+		uint8* srcLine = ((uint8*) rgb) + y * width * 3;
+		uint8* dstLine = lum->data.u8 + y * lum->step;
+		for (int x = 0, x3 = 0; x < width; x++, x3 += 3)
+			dstLine[x] = DivideByThree(srcLine[x3] + srcLine[x3 + 1] + srcLine[x3 + 2]);
 	}
 }
+*/
 
-void Util_Copy(ccv_dense_matrix_t* dst, ccv_dense_matrix_t* src)
+/*
+ccv_dense_matrix_t* Util_RGB_to_CCV_Lum8(int width, int height, const void* rgb)
 {
-	assert(CCV_GET_CHANNEL(src->type) == CCV_GET_CHANNEL(dst->type));
-	assert(CCV_GET_DATA_TYPE(src->type) == CCV_GET_DATA_TYPE(dst->type));
-	assert(src->rows == dst->rows);
-	assert(src->cols == dst->cols);
+	ccv_dense_matrix_t* lum = ccv_dense_matrix_new(height, width, CCV_8U | CCV_C1, nullptr, 0);
+	Util_RGB_to_Lum(width, height, rgb, lum);
+	return lum;
+}
+*/
 
-	size_t dataSize = ccv_compute_dense_matrix_size(src->rows, src->cols, src->type) - sizeof(ccv_dense_matrix_t);
-	memcpy(dst->data.u8, src->data.u8, dataSize);
 }

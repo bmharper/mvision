@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef SX_CCV
+
 class Tracker
 {
 public:
@@ -19,3 +21,5 @@ private:
 
 	ccv_dense_matrix_t*		RGB24_to_Lum8_Scaled(int width, int height, void* data);
 };
+
+#endif
