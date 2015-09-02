@@ -16,6 +16,8 @@
 
 //#include <VideoCapture.h>
 
+#include <stdint.h>
+
 #include <windows.h>
 #include <windowsx.h>
 #include <d3d9.h>
@@ -54,4 +56,5 @@ extern "C" {
 
 #ifdef SX_OPENCV
 #include <opencv2/features2d.hpp>
+#include <opencv2/video.hpp>
 #endif

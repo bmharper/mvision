@@ -30,7 +30,10 @@ static Module M_Sift = { Sift_Start, Sift_End };
 #ifdef SX_OPENCV
 void ORB_Start(xoDoc* doc);
 void ORB_End();
+void BackgroundSubtractor_Start(xoDoc* doc);
+void BackgroundSubtractor_End();
 static Module M_ORB = { ORB_Start, ORB_End };
+static Module M_BackgroundSubtractor = { BackgroundSubtractor_Start, BackgroundSubtractor_End };
 #endif
 
 void Motion_Start(xoDoc* doc);
@@ -39,8 +42,9 @@ static Module M_Motion = { Motion_Start, Motion_End };
 
 //static Module *Mod = &M_TLD;
 //static Module *Mod = &M_Sift;
-//static Module *Mod = &M_Motion;
-static Module *Mod = &M_ORB;
+static Module *Mod = &M_Motion;
+//static Module *Mod = &M_ORB;
+//static Module *Mod = &M_BackgroundSubtractor;
 
 // Helpers
 static void LoadCCV();

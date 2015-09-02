@@ -14,6 +14,7 @@ MotionDetector::~MotionDetector()
 	delete Prev;
 	delete Stable;
 	delete DebugImage;
+	delete NoiseImg;
 }
 
 void MotionDetector::Frame(Image* frame)
@@ -27,12 +28,7 @@ void MotionDetector::Frame(Image* frame)
 		myframe = frame->HalfSize_Box_Until(false, width);
 
 	if (Prev)
-	{
-		float noise = ComputeNoise(Prev, myframe);
-		float a = std::min(NFrames, (int64_t) 500);
-		float b = 1;
-		Noise = (a * Noise + b * noise) / (a + b);
-	}
+		ComputeNoise(Prev, myframe);
 
 	if (Stable)
 		ComputePixelsInMotion(myframe);
@@ -50,22 +46,34 @@ void MotionDetector::Frame(Image* frame)
 	NFrames++;
 }
 
-float MotionDetector::ComputeNoise(Image* a, Image* b)
+void MotionDetector::ComputeNoise(Image* a, Image* b)
 {
-	// uber-simple: just treat the entire scene as noise.
 	assert(a->Width == b->Width && a->Height == b->Height && a->Fmt == b->Fmt && a->Fmt == ImgFmt::Lum8u);
 
-	uint32 sumDiff = 0;
+	if (!NoiseImg)
+	{
+		NoiseImg = new Image();
+		if (!NoiseImg->Alloc(ImgFmt::Lum32f, a->Width, a->Height))
+		{
+			delete NoiseImg;
+			return;
+		}
+		NoiseImg->FillBytes(0);
+	}
+
 	for (int y = 0; y < a->Height; y++)
 	{
 		int width = a->Width;
 		uint8* aline = a->RowPtr8u(y);
 		uint8* bline = b->RowPtr8u(y);
+		float* nline = NoiseImg->RowPtr32f(y);
 		for (int x = 0; x < width; x++)
-			sumDiff += AbsDiff(aline[x], bline[x]);
+		{
+			uint32 diff = AbsDiff(aline[x], bline[x]);
+			if (diff < 5)
+				nline[x] = nline[x] * 0.98f + (float) diff * 0.02f;
+		}
 	}
-
-	return (float) sumDiff / (float) (a->Width * a->Height);
 }
 
 void MotionDetector::ComputePixelsInMotion(Image* frame)
@@ -73,20 +81,29 @@ void MotionDetector::ComputePixelsInMotion(Image* frame)
 	if (!DebugImage && OutputDebugImage)
 		DebugImage = frame->Clone();
 
-	// minNoise and threshold are empirically tweaked
-	float minNoise = 0.25f;
-	float threshold = 16.0f;
+	// constants here are empirically tweaked
+	//float minNoise = 0.25f;
+	//float maxNoise = 3.00f;
+	//float threshold_local = 16.0f;
+	//float threshold_global = 0.1f;
+	//float cnoise = Clamp(Noise, minNoise, maxNoise);
 
-	float thresholdf32 = std::max(Noise, minNoise) * threshold / 255.0f;
+	//float threshold_local_f32 = maxNoise * threshold_local / 255.0f;
 	int nmoving = 0;
+	float totalDiff = 0;
+	float totalNoise = 0;
 	for (int y = 0; y < frame->Height; y++)
 	{
 		float* lstable = Stable->RowPtr32f(y);
 		uint8* lframe = frame->RowPtr8u(y);
+		float* lnoise = NoiseImg->RowPtr32f(y);
 		for (int i = 0; i < frame->Width; i++)
 		{
-			float diff = fabs(lstable[i] - (lframe[i] / 255.0f));
-			if (diff > thresholdf32)
+			float diff = fabs(lstable[i] - (lframe[i] * (1.0f / 255.0f)));
+			totalDiff += diff;
+			totalNoise += lnoise[i];
+			float threshold_local = lnoise[i] * 0.5;
+			if (diff > threshold_local)
 			{
 				nmoving++;
 				if (OutputDebugImage)
@@ -99,8 +116,11 @@ void MotionDetector::ComputePixelsInMotion(Image* frame)
 			}
 		}
 	}
+	Noise = totalNoise;
+	GlobalAvgDiff = totalDiff / (frame->Width * frame->Height);
 
-	IsMotion = nmoving >= 3;
+	IsLocalMotion = nmoving >= 3;
+	IsGlobalMotion = GlobalAvgDiff > totalNoise * 0.001;
 }
 
 void MotionDetector::MergeIntoPrev(Image* frame)

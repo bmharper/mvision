@@ -42,6 +42,12 @@ bool Image::Alloc(ImgFmt fmt, int width, int height)
 	return true;
 }
 
+void Image::FillBytes(uint8 byteVal) const
+{
+	for (int y = 0; y < Height; y++)
+		memset(RowPtr(y), byteVal, LineBytes());
+}
+
 void Image::CopyTo(Image* dst) const
 {
 	assert(dst->Width == Width);

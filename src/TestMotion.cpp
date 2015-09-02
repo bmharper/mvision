@@ -15,7 +15,8 @@ static struct Motion_t
 
 static void UpdateStats()
 {
-	auto msg = fmt("Noise: %.3f. %s", Motion.Detector->Noise, Motion.Detector->IsMotion ? "MOVE" : "--");
+	auto detector = Motion.Detector;
+	auto msg = fmt("Noise: %.3f %.3f. %s %s", detector->Noise, detector->GlobalAvgDiff, detector->IsLocalMotion ? "LocalMotion" : "", detector->IsGlobalMotion ? "GlobalMotion" : "");
 	Motion.Stats->SetText(msg.Z);
 }
 

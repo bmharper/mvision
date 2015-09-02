@@ -21,11 +21,14 @@ class MotionDetector
 {
 public:
 	Image*		DebugImage = nullptr;
-	Image*		Prev = nullptr;			// Our previous frame
-	Image*		Stable = nullptr;		// Our long-term idea of what the scene is supposed to look like
+	Image*		Prev = nullptr;				// Our previous frame
+	Image*		Stable = nullptr;			// Our long-term idea of what the scene is supposed to look like
+	Image*		NoiseImg = nullptr;			// Noisy-ness of each pixel
 	float		Noise = 0;
 	int64_t		NFrames = 0;
-	bool		IsMotion = false;
+	float		GlobalAvgDiff = 0;			// This is used to determine IsGlobalMotion
+	bool		IsLocalMotion = false;		// Is there localized, acute motion in a smallish region
+	bool		IsGlobalMotion = false;		// Is there global, possible minor motion, across the entire frame (ie camera is being shaken - aka stolen)
 	bool		OutputDebugImage = true;
 
 	MotionDetector();
@@ -35,7 +38,7 @@ public:
 	void					Frame(Image* frame);
 
 private:
-	float					ComputeNoise(Image* a, Image* b);
+	void					ComputeNoise(Image* a, Image* b);
 	void					ComputePixelsInMotion(Image* frame);
 	void					MergeIntoPrev(Image* frame);
 

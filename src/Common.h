@@ -33,6 +33,8 @@ struct Timer
 	}
 };
 
+template<typename T> T Clamp(T v, T low, T high) { return v < low ? low : (v > high ? high : v); }
+
 void		Util_ImageToCanvas(const Image* img, xoCanvas2D* ccx);
 void		Util_LumToCanvas(const Image* lum, xoCanvas2D* ccx, int canvasX = 0, int canvasY = 0, int scale = 1);
 

@@ -277,6 +277,7 @@ local WebcamShow = Program {
 		"WebcamShow.cpp",
 		"Tracker.cpp",
 		"Tracker.h",
+		"TestBackgroundSubtractor.cpp",
 		"TestMotion.cpp",
 		"TestORB.cpp",
 		"TestSIFT.cpp",

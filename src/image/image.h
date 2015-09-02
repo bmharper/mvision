@@ -30,6 +30,7 @@ public:
 	~Image();
 	void	Free();
 	bool	Alloc(ImgFmt fmt, int width, int height);
+	void	FillBytes(uint8 byteVal) const;
 	void	CopyTo(Image* dst) const;
 	Image*	Clone(ImgFmt dstFormat = ImgFmt::Null) const;
 	Image* 	HalfSize_Box(bool sRGB);

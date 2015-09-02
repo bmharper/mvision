@@ -57,7 +57,7 @@ static bool OnTimer(const xoEvent& ev)
 				c2d->StrokeRect(xoBox(tbox->x, tbox->y, tbox->x + tbox->width, tbox->y + tbox->height), xoColor::RGBA(200, 0, 0, 200), 1);
 
 			canvas->ReleaseCanvas(c2d);
-			free(cameraFrame);
+			delete cameraFrame;
 		}
 	}
 	return true;

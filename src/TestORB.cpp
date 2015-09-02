@@ -12,7 +12,7 @@ void ORB_Start(xoDoc* doc)
 {
 	using namespace cv;
 
-	Orb = cv::ORB::create(4000);
+	Orb = cv::ORB::create(10000);
 
 	auto onTimer = [](Image* frame, xoCanvas2D* cx, xoDomNode* label) -> void
 	{
@@ -32,6 +32,7 @@ void ORB_Start(xoDoc* doc)
 
 void ORB_End()
 {
+	Orb.release();
 }
 
 }
