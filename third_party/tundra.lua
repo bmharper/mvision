@@ -2,7 +2,9 @@
 local mingw_common = {
 	Env = {
 		CCOPTS_RELEASE = {
-			{ "-O2" },
+			-- On my SIFT example, O3 to O2 takes times from around 600ms closer to 500ms (but probably not
+			-- as much as 100ms). -03 is MUCH slower though to compile.
+			{ "-O2", "-ffast-math" },
 		},
 	},
 }

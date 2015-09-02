@@ -5,9 +5,9 @@
 #include "cameras/win_capture/capture_device.h"
 
 #ifdef WEBCAMSHOW_CPP
-#define LINKAGE
+#define SX_LINKAGE
 #else
-#define LINKAGE extern
+#define SX_LINKAGE extern
 #endif
 
 namespace sx
@@ -18,18 +18,27 @@ struct Global_t
 	xoSysWnd*		MainWnd;
 	CaptureDevice*	Camera;
 };
-LINKAGE Global_t Global;
+SX_LINKAGE Global_t Global;
+
+struct Timer
+{
+	std::chrono::system_clock::time_point	Start;
+	Timer()
+	{
+		Start = std::chrono::high_resolution_clock::now();
+	}
+	double DurationMS() const
+	{
+		return (double) std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - Start).count();
+	}
+};
 
 void		Util_ImageToCanvas(const Image* img, xoCanvas2D* ccx);
 void		Util_LumToCanvas(const Image* lum, xoCanvas2D* ccx, int canvasX = 0, int canvasY = 0, int scale = 1);
-Image* 		Util_Lum_HalfSize_Box(Image* lum, bool sRGB);
-Image* 		Util_Lum_HalfSize_Box_Until(Image* lum, bool sRGB, int widthLessThanOrEqualTo);
-Image* 		Util_Clone(Image* org, ImgFmt targetFmt = ImgFmt::Null);
 
-//void					Util_RGB_to_Lum(int width, int height, const void* rgb, ccv_dense_matrix_t* lum);
-//ccv_dense_matrix_t*		Util_RGB_to_CCV_Lum8(int width, int height, const void* rgb);
+void		Util_SetupTestUI(xoDoc* doc, std::function<void(Image* frame, xoCanvas2D* cx, xoDomNode* label)> onTimer);
 
 }
 
-#undef LINKAGE
+#undef SX_LINKAGE
 

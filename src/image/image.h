@@ -32,10 +32,21 @@ public:
 	bool	Alloc(ImgFmt fmt, int width, int height);
 	void	CopyTo(Image* dst) const;
 	Image*	Clone(ImgFmt dstFormat = ImgFmt::Null) const;
+	Image* 	HalfSize_Box(bool sRGB);
+	Image* 	HalfSize_Box_Until(bool sRGB, int widthLessThanOrEqualTo);
+
+#ifdef SX_CCV
+	ccv_dense_matrix_t*	ToCCV() const;
+#endif
+
+#ifdef SX_OPENCV
+	cv::Mat ToOpenCV_NoCopy() const;
+#endif
 
 	void*	RowPtr(int row) const { return (byte*) Scan0 + row * Stride; }
 	uint8*	RowPtr8u(int row) const { return (uint8*) Scan0 + row * Stride; }
 	float*	RowPtr32f(int row) const { return (float*) ((uint8*) Scan0 + row * Stride); }
+	int		LineBytes() const { return ImgFmt_BytesPP(Fmt) * Width; }
 };
 
 }

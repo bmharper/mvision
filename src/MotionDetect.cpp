@@ -24,7 +24,7 @@ void MotionDetector::Frame(Image* frame)
 
 	Image* myframe = frame;
 	if (frame->Width > width)
-		myframe = Util_Lum_HalfSize_Box_Until(frame, false, width);
+		myframe = frame->HalfSize_Box_Until(false, width);
 
 	if (Prev)
 	{

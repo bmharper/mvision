@@ -1,12 +1,22 @@
 require "tundra.syntax.glob"
 require "tundra.syntax.files"
+require "tundra.util"
+
+-- Global options
+local enableStaticCrt = false
+local enableCCV_MinGW = true
+local enableOpenCV = true
 
 local function ccv_path(config, file)
 	return "third_party/t2-output/win64-mingw-" .. config .. "-default/" .. file
 end
 
+local function opencv_path()
+	return "C:/dev/tools/opencv/build/x64/vc12/lib/"
+end
+
 local function xo_path(config, file)
-	return "../xo/t2-output/win64-msvc2015-" .. config .. "-default/" .. file
+	return "../xo/t2-output/win64-msvc2013-" .. config .. "-default/" .. file
 end
 
 local winKernelLibs = { "kernel32.lib", "user32.lib", "gdi32.lib", "winspool.lib", "advapi32.lib", "shell32.lib", "comctl32.lib", 
@@ -73,6 +83,9 @@ local crtStatic = ExternalLibrary {
 }
 
 local crt = crtDynamic
+if enableStaticCrt then
+	crt = crtStatic
+end
 
 -- I'm giving up on libccv until I can get it compiling natively on Windows.
 -- I don't know when or why it happened, but at some point I just started 
@@ -207,22 +220,48 @@ local HelloWorld = Program {
 	},
 }
 
+local libccv_libs = {}
+local libccv_defines = {}
+if enableCCV_MinGW then
+	libccv_libs = { "libccv.lib", "Delayimp.lib" }
+	libccv_defines = { "SX_CCV" }
+end
+
+local opencv_libs = {}
+local opencv_defines = {}
+if enableOpenCV then
+	opencv_libs = {
+		{ "opencv_world300d.lib"; Config = "win*-*-debug-*" },
+		{ "opencv_world300.lib"; Config = "win*-*-release-*" },
+	}
+	opencv_defines = { "SX_OPENCV" }
+end
+
 local WebcamShow = Program {
 	Name = "WebcamShow",
 	SourceDir = "src/",
 	Depends = { xo_env, xo, crt },
+	Defines = tundra.util.merge_arrays(libccv_defines, opencv_defines),
 	Env = {
 		LIBPATH = {
 			{ ccv_path("debug", "");   Config = "win64-*-debug-default" },
 			{ ccv_path("release", ""); Config = "win64-*-release-default" },
+			{ opencv_path();           Config = "win*" },
 		},
-		-- PROGOPTS = {
-		-- 	"/DELAYLOAD:libccv.dll"; Config = "win*", 
-		-- },
+		PROGOPTS = {
+			"/DELAYLOAD:libccv.dll"; Config = "win*", 
+		},
 	},
-	Libs = { "mfplat.lib", "mf.lib", "mfreadwrite.lib", "mfuuid.lib", "d3d9.lib", "shlwapi.lib", "user32.lib", "ole32.lib", "opengl32.lib", "user32.lib", "gdi32.lib" },
-	-- Libs = { "libccv.lib", "Delayimp.lib" }
-	Includes = { "src/", "../", ".", }, -- the ../ is for /xo/...
+	Libs = tundra.util.merge_arrays(
+		{ "mfplat.lib", "mf.lib", "mfreadwrite.lib", "mfuuid.lib", "d3d9.lib", "shlwapi.lib", "user32.lib", "ole32.lib", "opengl32.lib", "user32.lib", "gdi32.lib" },
+		libccv_libs,
+		opencv_libs ),
+	Includes = {
+		"src/",
+		"../",		-- for /xo/...
+		".",
+		"c:/dev/tools/opencv/build/include"
+	}, 
 	PrecompiledHeader = {
 		Source = "src/pch.cpp",
 		Header = "pch.h",
@@ -239,6 +278,7 @@ local WebcamShow = Program {
 		"Tracker.cpp",
 		"Tracker.h",
 		"TestMotion.cpp",
+		"TestORB.cpp",
 		"TestSIFT.cpp",
 		"TestTLD.cpp",
 		"cameras/Cameras.h",
@@ -264,11 +304,28 @@ local WebcamShow = Program {
 --local copy_2 = CopyFileInvariant { Source = 'a', Target = 'b' }
 
 -- This was used when building libccv via an external project that uses mingw toolchain
--- local copy_libccv = CopyFile {
--- 	Source = ccv_path("$(CURRENT_VARIANT)", "libccv.dll"),
--- 	Target = '$(OBJECTDIR)/libccv.dll'
--- }
--- Default(copy_libccv)
+if enableCCV_MinGW then
+	local copy_libccv = CopyFile {
+		Source = ccv_path("$(CURRENT_VARIANT)", "libccv.dll"),
+		Target = '$(OBJECTDIR)/libccv.dll'
+	}
+	Default(copy_libccv)
+end
+
+if enableOpenCV then
+	local copy_opencv_debug = CopyFile {
+		Source = "C:/dev/tools/opencv/build/x64/vc12/bin/opencv_world300d.dll",
+		Target = "$(OBJECTDIR)/opencv_world300d.dll"
+	}
+	Default(copy_opencv_debug)
+
+	local copy_opencv_release = CopyFile {
+		Source = "C:/dev/tools/opencv/build/x64/vc12/bin/opencv_world300.dll",
+		Target = "$(OBJECTDIR)/opencv_world300.dll"
+	}
+	Default(copy_opencv_release)
+end
+
 
 --local playcap = Program {
 --	Name = "playcap",

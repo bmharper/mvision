@@ -4,6 +4,9 @@
 
 #ifdef SX_CCV
 
+namespace sx
+{
+
 static struct TLD_t
 {
 	bool		IsDragging = false;
@@ -12,14 +15,14 @@ static struct TLD_t
 	Tracker*	Track;
 } TLD;
 
-static void StartTracker(int width, int height, void* rgb24, ccv_rect_t box)
+static void StartTracker(Image* rgb24, ccv_rect_t box)
 {
 	delete TLD.Track;
 	TLD.Track = new Tracker();
-	TLD.Track->Initialize(width, height, rgb24, box);
+	TLD.Track->Initialize(rgb24, box);
 }
 
-static ccv_rect_t AddToTracker(int width, int height, void* rgb24)
+static ccv_rect_t AddToTracker(Image* rgb24)
 {
 	ccv_comp_t box;
 	ccv_tld_info_t info;
@@ -33,23 +36,23 @@ static bool OnTimer(const xoEvent& ev)
 
 	if (Global.Camera)
 	{
-		void* cameraFrame = Global.Camera->NextFrame();
+		Image* cameraFrame = Global.Camera->NextFrame();
 		if (cameraFrame)
 		{
 			int width = Global.Camera->Width();
 			int height = Global.Camera->Height();
 			auto c2d = canvas->GetCanvas2D();
 
-			Util_CameraToCanvas(Global.Camera, cameraFrame, c2d);
+			Util_ImageToCanvas(cameraFrame, c2d);
 
 			auto *tbox = &TLD.TrackBox;
 			if (TLD.StartTrack)
 			{
 				TLD.StartTrack = false;
-				StartTracker(width, height, cameraFrame, *tbox);
+				StartTracker(cameraFrame, *tbox);
 			}
 			else if (TLD.Track)
-				*tbox = AddToTracker(width, height, cameraFrame);
+				*tbox = AddToTracker(cameraFrame);
 			if (TLD.IsDragging || TLD.Track)
 				c2d->StrokeRect(xoBox(tbox->x, tbox->y, tbox->x + tbox->width, tbox->y + tbox->height), xoColor::RGBA(200, 0, 0, 200), 1);
 
@@ -93,6 +96,8 @@ void TLD_End()
 {
 	delete TLD.Track;
 	TLD.Track = NULL;
+}
+
 }
 
 #endif

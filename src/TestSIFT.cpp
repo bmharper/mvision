@@ -3,6 +3,9 @@
 
 #ifdef SX_CCV
 
+namespace sx
+{
+
 static struct Sift_t
 {
 	xoDomCanvas*	Canvas;
@@ -14,15 +17,15 @@ static bool OnTimer(const xoEvent& ev)
 	auto cam = Global.Camera;
 	if (cam)
 	{
-		void* cameraFrame = cam->NextFrame();
+		Image* cameraFrame = cam->NextFrame();
 		if (cameraFrame)
 		{
 			auto c1 = Sift.Canvas->GetCanvas2D();
-			Util_CameraToCanvas(cam, cameraFrame, c1);
+			Util_ImageToCanvas(cameraFrame, c1);
 
-			ccv_dense_matrix_t* lum = Util_RGB_to_CCV_Lum8(cam->Width(), cam->Height(), cameraFrame);
-			ccv_dense_matrix_t* half = Util_Lum_HalfSize_Box(lum, false);
-			ccv_dense_matrix_t* quarter = Util_Lum_HalfSize_Box(half, false);
+			auto tmp8 = cameraFrame->Clone(ImgFmt::Lum8u);
+			ccv_dense_matrix_t* lum = tmp8->ToCCV();
+			delete tmp8;
 
 			ccv_sift_param_t param;
 			param.noctaves = 3;
@@ -50,8 +53,6 @@ static bool OnTimer(const xoEvent& ev)
 				c1->SetPixel(ix, iy, xoRGBA::RGBA(0, 255, 0, 255));
 			}
 			ccv_array_free(keypoints);
-			ccv_matrix_free(quarter);
-			ccv_matrix_free(half);
 			ccv_matrix_free(lum);
 
 			Sift.Canvas->ReleaseCanvas(c1);
@@ -74,6 +75,8 @@ void Sift_Start(xoDoc* doc)
 
 void Sift_End()
 {
+}
+
 }
 
 #endif

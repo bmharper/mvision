@@ -52,3 +52,6 @@ extern "C" {
 }
 #undef __attribute__
 
+#ifdef SX_OPENCV
+#include <opencv2/features2d.hpp>
+#endif

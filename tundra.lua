@@ -40,15 +40,13 @@ Build {
 			--DefaultOnHost = "windows",
 			SupportedHosts = { "windows" },
 			Inherit = win_common,
-			--Tools = { {"msvc-vs2012"; TargetArch = "x86", WinSDK8 = "C:\\Program Files (x86)\\Windows Kits\\8.0"} },
-			Tools = { {"msvc-vs2015"; TargetArch = "x86"} },
+			Tools = { {"msvc-vs2013"; TargetArch = "x86"} },
 		},
 		{
 			Name = "win64-msvc",
 			DefaultOnHost = "windows",
 			Inherit = win_common,
-			--Tools = { {"msvc-vs2012"; TargetArch = "x64", WinSDK8 = "C:\\Program Files (x86)\\Windows Kits\\8.0"} },
-			Tools = { {"msvc-vs2015"; TargetArch = "x64"} },
+			Tools = { {"msvc-vs2013"; TargetArch = "x64"} },
 		},
 		{
 			Name = "win64-mingw",
