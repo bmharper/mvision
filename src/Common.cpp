@@ -1,8 +1,16 @@
 #include "pch.h"
 #include "Common.h"
 
+#define MICROLOG_IMPLEMENTATION
+#include "third_party/microlog.h"
+
 namespace sx
 {
+
+microlog::Logger* Log()
+{
+	return &Global.Log;
+}
 
 // Use 'div.exe' by AMD to calculate these things. Valid ranges are up to 32k or 64k, I'm not sure.
 inline uint32 DivideByThree(uint32 i)
@@ -13,16 +21,26 @@ inline uint32 DivideByThree(uint32 i)
 
 void Util_ImageToCanvas(const Image* img, xoCanvas2D* ccx)
 {
-	assert(img->Fmt == ImgFmt::RGB8u);
+	SXASSERT(img->Fmt == ImgFmt::RGB8u || img->Fmt == ImgFmt::RGBA8u);
 
-	for (int y = 0; y < img->Height; y++)
+	int width = std::min<int>(img->Width, ccx->Width());
+	int height = std::min<int>(img->Height, ccx->Height());
+
+	for (int y = 0; y < height; y++)
 	{
 		uint8* lineIn = (uint8*) img->RowPtr(y);
 		uint32* lineOut = (uint32*) ccx->RowPtr(y);
 		uint8* in = lineIn;
-		int width = img->Width;
-		for (int x = 0; x < width; x++, in += 3)
-			lineOut[x] = xoRGBA::RGBA(in[2], in[1], in[0], 255).u;
+		if (img->Fmt == ImgFmt::RGB8u)
+		{
+			for (int x = 0; x < width; x++, in += 3)
+				lineOut[x] = xoRGBA::RGBA(in[2], in[1], in[0], 255).u;
+		}
+		else if (img->Fmt == ImgFmt::RGBA8u)
+		{
+			for (int x = 0; x < width; x++, in += 4)
+				lineOut[x] = xoRGBA::RGBA(in[3], in[2], in[1], in[0]).u;
+		}
 	}
 	ccx->Invalidate();
 }
@@ -45,8 +63,8 @@ void WriteLumPxToCanvas(uint32* out, uint8 v)
 
 void Util_LumToCanvas(const Image* lum, xoCanvas2D* ccx, int canvasX, int canvasY, int scale)
 {
-	assert(canvasX + lum->Width * scale <= ccx->Width());
-	assert(canvasY + lum->Height * scale <= ccx->Height());
+	SXASSERT(canvasX + lum->Width * scale <= ccx->Width());
+	SXASSERT(canvasY + lum->Height * scale <= ccx->Height());
 	int outY = 0;
 	for (int y = 0; y < lum->Height; y++, outY += scale)
 	{

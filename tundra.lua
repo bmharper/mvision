@@ -1,9 +1,18 @@
 
+local common = {
+	Env = {
+		CPPPATH = {
+			-- "third_party/spdlog/include",
+		}
+	}
+}
+
 local win_linker = {
 	{ "/NXCOMPAT /DYNAMICBASE";		Config = "win*" },
 }
 
 local win_common = {
+	Inherit = common,
 	Env = {
 		CXXOPTS = {
 			{ "/EHsc"; Config = "win*" },
@@ -29,11 +38,13 @@ Build {
 			Name = "macosx-gcc",
 			DefaultOnHost = "macosx",
 			Tools = { "gcc" },
+			Inherit = common,
 		},
 		{
 			Name = "linux-gcc",
 			DefaultOnHost = "linux",
 			Tools = { "gcc" },
+			Inherit = common,
 		},
 		{
 			Name = "win32-msvc",
@@ -52,6 +63,7 @@ Build {
 			Name = "win64-mingw",
 			SupportedHosts = { "windows" },
 			Tools = { "mingw" },
+			Inherit = common,
 			-- Link with the C++ compiler to get the C++ standard library.
 			ReplaceEnv = {
     			PCHCOMPILE = "$(CC) $(_OS_CCOPTS) -c $(CPPDEFS:p-D) $(CPPPATH:f:p-I) $(CCOPTS) $(CCOPTS_$(CURRENT_VARIANT:u)) -o $(@) $(<)",
@@ -78,7 +90,12 @@ Build {
 		},
 		-- Override solutions to generate and what units to put where.
 		MsvcSolutions = {
-			['mvision.sln'] = {}, -- receives all the units due to empty set
+			['mvision.sln'] = {
+				"HelloWorld",
+				"live555",
+				"yuv",
+				"WebcamShow",
+			},
 		},
 		BuildAllByDefault = true,
 	},

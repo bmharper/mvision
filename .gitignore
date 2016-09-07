@@ -1,3 +1,4 @@
 .tundra2.*
 t2-output
 MFCaptureD3D/Debug
+third_party/intel_media_sdk/bin

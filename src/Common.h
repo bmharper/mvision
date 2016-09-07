@@ -2,8 +2,9 @@
 
 #include "image/image.h"
 #include "cameras/Cameras.h"
-#include "cameras/win_capture/capture_device.h"
+#include "util/Error.h"
 
+// SX_LINKAGE is undef'ed at the end of this header
 #ifdef WEBCAMSHOW_CPP
 #define SX_LINKAGE
 #else
@@ -13,27 +14,20 @@
 namespace sx
 {
 
+class Live555Environment;
+
 struct Global_t
 {
-	xoSysWnd*		MainWnd;
-	CaptureDevice*	Camera;
+	xoSysWnd*				MainWnd = nullptr;
+	ICamera*				Camera = nullptr;
+#ifdef SX_LIVE555
+	Live555Environment*		Live555Env = nullptr;
+#endif
+	microlog::Logger		Log;
 };
 SX_LINKAGE Global_t Global;
 
-struct Timer
-{
-	std::chrono::system_clock::time_point	Start;
-	Timer()
-	{
-		Start = std::chrono::high_resolution_clock::now();
-	}
-	double DurationMS() const
-	{
-		return (double) std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - Start).count();
-	}
-};
-
-template<typename T> T Clamp(T v, T low, T high) { return v < low ? low : (v > high ? high : v); }
+microlog::Logger* Log();
 
 void		Util_ImageToCanvas(const Image* img, xoCanvas2D* ccx);
 void		Util_LumToCanvas(const Image* lum, xoCanvas2D* ccx, int canvasX = 0, int canvasY = 0, int scale = 1);

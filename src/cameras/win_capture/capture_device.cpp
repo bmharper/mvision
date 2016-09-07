@@ -6,7 +6,7 @@
 namespace sx
 {
 
-CaptureDevice::CaptureDevice()
+WinCaptureDevice::WinCaptureDevice()
 {
 	SymbolicLink = NULL;
 	RefCount = 1;
@@ -16,24 +16,24 @@ CaptureDevice::CaptureDevice()
 	Frames.Initialize(false);
 }
 
-CaptureDevice::~CaptureDevice()
+WinCaptureDevice::~WinCaptureDevice()
 {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ICamera methods
 
-int CaptureDevice::Width()
+int WinCaptureDevice::Width()
 {
 	return InputWidth;
 }
 
-int CaptureDevice::Height()
+int WinCaptureDevice::Height()
 {
 	return InputHeight;
 }
 
-Image* CaptureDevice::NextFrame()
+Image* WinCaptureDevice::NextFrame()
 {
 	Image* next = nullptr;
 	Frames.PopTail(next);
@@ -43,12 +43,12 @@ Image* CaptureDevice::NextFrame()
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // IUnknown methods
 
-ULONG CaptureDevice::AddRef()
+ULONG WinCaptureDevice::AddRef()
 {
 	return InterlockedIncrement(&RefCount);
 }
 
-ULONG CaptureDevice::Release()
+ULONG WinCaptureDevice::Release()
 {
 	ULONG uCount = InterlockedDecrement(&RefCount);
 	if (uCount == 0)
@@ -57,11 +57,11 @@ ULONG CaptureDevice::Release()
 	return uCount;
 }
 
-HRESULT CaptureDevice::QueryInterface(REFIID riid, void** ppv)
+HRESULT WinCaptureDevice::QueryInterface(REFIID riid, void** ppv)
 {
 	static const QITAB qit[] =
 	{
-		QITABENT(CaptureDevice, IMFSourceReaderCallback),
+		QITABENT(WinCaptureDevice, IMFSourceReaderCallback),
 		{ 0 },
 	};
 	return QISearch(this, qit, riid, ppv);
@@ -70,7 +70,7 @@ HRESULT CaptureDevice::QueryInterface(REFIID riid, void** ppv)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // IMFSourceReaderCallback methods
 
-HRESULT CaptureDevice::OnReadSample(HRESULT hrStatus, DWORD dwStreamIndex, DWORD dwStreamFlags, LONGLONG llTimestamp, IMFSample *pSample)
+HRESULT WinCaptureDevice::OnReadSample(HRESULT hrStatus, DWORD dwStreamIndex, DWORD dwStreamFlags, LONGLONG llTimestamp, IMFSample *pSample)
 {
 	HRESULT hr = S_OK;
 	IMFMediaBuffer *pBuffer = NULL;
@@ -126,19 +126,19 @@ HRESULT CaptureDevice::OnReadSample(HRESULT hrStatus, DWORD dwStreamIndex, DWORD
 	return hr;
 }
 
-HRESULT CaptureDevice::OnEvent(DWORD, IMFMediaEvent *)
+HRESULT WinCaptureDevice::OnEvent(DWORD, IMFMediaEvent *)
 {
 	return S_OK;
 }
 
-HRESULT CaptureDevice::OnFlush(DWORD)
+HRESULT WinCaptureDevice::OnFlush(DWORD)
 {
 	return S_OK;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void CaptureDevice::Close()
+void WinCaptureDevice::Close()
 {
 	EnableCapture = 0;
 	while (Frames.Size() != 0)
@@ -148,7 +148,7 @@ void CaptureDevice::Close()
 	SymbolicLink = NULL;
 }
 
-bool CaptureDevice::InitializeFirst(std::string& error)
+bool WinCaptureDevice::InitializeFirst(std::string& error)
 {
 	HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 	if (!SUCCEEDED(hr))
@@ -168,7 +168,7 @@ bool CaptureDevice::InitializeFirst(std::string& error)
 
 	memset(&InputType, 0, sizeof(InputType));
 
-	IMFActivate* activate = CaptureDevice::ChooseFirst(error);
+	IMFActivate* activate = WinCaptureDevice::ChooseFirst(error);
 	if (!activate)
 		return false;
 
@@ -261,7 +261,7 @@ bool CaptureDevice::InitializeFirst(std::string& error)
 	return SUCCEEDED(hr);
 }
 
-bool CaptureDevice::IsMediaTypeSupported(IMFMediaType* pType, GUID& typeId)
+bool WinCaptureDevice::IsMediaTypeSupported(IMFMediaType* pType, GUID& typeId)
 {
 	GUID subtype = { 0 };
 	HRESULT hr = pType->GetGUID(MF_MT_SUBTYPE, &subtype);
@@ -274,7 +274,7 @@ bool CaptureDevice::IsMediaTypeSupported(IMFMediaType* pType, GUID& typeId)
 	return false;
 }
 
-HRESULT CaptureDevice::GetDefaultStride(IMFMediaType* pType, LONG* plStride)
+HRESULT WinCaptureDevice::GetDefaultStride(IMFMediaType* pType, LONG* plStride)
 {
 	LONG lStride = 0;
 
@@ -313,7 +313,7 @@ HRESULT CaptureDevice::GetDefaultStride(IMFMediaType* pType, LONG* plStride)
 	return hr;
 }
 
-IMFActivate* CaptureDevice::ChooseFirst(std::string& error)
+IMFActivate* WinCaptureDevice::ChooseFirst(std::string& error)
 {
 	IMFActivate* result = NULL;
 	HRESULT hr = S_OK;
@@ -361,7 +361,7 @@ done:
 	return result;
 }
 
-std::string CaptureDevice::ErrorMessage(PCWSTR format, HRESULT hrErr)
+std::string WinCaptureDevice::ErrorMessage(PCWSTR format, HRESULT hrErr)
 {
 	HRESULT hr = S_OK;
 	TCHAR msg[1024];

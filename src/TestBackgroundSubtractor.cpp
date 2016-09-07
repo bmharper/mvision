@@ -20,7 +20,7 @@ void BackgroundSubtractor_Start(xoDoc* doc)
 		Mat fgmask;
 		Timer timer;
 		BGSub->apply(frame->ToOpenCV_NoCopy(), fgmask);
-		label->SetText(fmt("%f", timer.DurationMS()).Z);
+		label->SetText(xo::fmt("%f", timer.DurationMS()).Z);
 
 		for (int y = 0; y < fgmask.rows; y++)
 		{

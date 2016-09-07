@@ -5,11 +5,11 @@
 namespace sx
 {
 
-class CaptureDevice : public IMFSourceReaderCallback, public ICamera
+class WinCaptureDevice : public IMFSourceReaderCallback, public ICamera
 {
 public:
-	CaptureDevice();
-	~CaptureDevice();
+	WinCaptureDevice();
+	~WinCaptureDevice();
 	bool					InitializeFirst(std::string& error);
 	void					Close();
 

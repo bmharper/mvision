@@ -19,7 +19,7 @@ MotionDetector::~MotionDetector()
 
 void MotionDetector::Frame(Image* frame)
 {
-	assert(frame->Fmt == ImgFmt::Lum8u);
+	SXASSERT(frame->Fmt == ImgFmt::Lum8u);
 
 	const int width = 20;
 
@@ -48,7 +48,7 @@ void MotionDetector::Frame(Image* frame)
 
 void MotionDetector::ComputeNoise(Image* a, Image* b)
 {
-	assert(a->Width == b->Width && a->Height == b->Height && a->Fmt == b->Fmt && a->Fmt == ImgFmt::Lum8u);
+	SXASSERT(a->Width == b->Width && a->Height == b->Height && a->Fmt == b->Fmt && a->Fmt == ImgFmt::Lum8u);
 
 	if (!NoiseImg)
 	{
@@ -71,7 +71,7 @@ void MotionDetector::ComputeNoise(Image* a, Image* b)
 		{
 			uint32 diff = AbsDiff(aline[x], bline[x]);
 			if (diff < 5)
-				nline[x] = nline[x] * 0.98f + (float) diff * 0.02f;
+				nline[x] = nline[x] * 0.99f + (float) diff * 0.01f;
 		}
 	}
 }
@@ -102,7 +102,7 @@ void MotionDetector::ComputePixelsInMotion(Image* frame)
 			float diff = fabs(lstable[i] - (lframe[i] * (1.0f / 255.0f)));
 			totalDiff += diff;
 			totalNoise += lnoise[i];
-			float threshold_local = lnoise[i] * 0.5;
+			float threshold_local = lnoise[i] * 1.1;
 			if (diff > threshold_local)
 			{
 				nmoving++;
@@ -130,7 +130,7 @@ void MotionDetector::MergeIntoPrev(Image* frame)
 
 	// Greater numbers cause a more "sticky" stable image
 	// Lower numbers would allow somebody to trick the system by moving vewwy vewwy slowly
-	const float stability = 100.0f;
+	const float stability = 300.0f;
 
 	for (int y = 0; y < Stable->Height; y++)
 	{

@@ -27,7 +27,7 @@ void Sift_Start(xoDoc* doc)
 		ccv_array_t* keypoints = nullptr;
 		Timer timer;
 		ccv_sift(lum, &keypoints, nullptr, 0, param);
-		label->SetText(fmt("%f", timer.DurationMS()).Z);
+		label->SetText(xo::fmt("%f", timer.DurationMS()).Z);
 
 		for (int i = 0; i < keypoints->rnum; i++)
 		{

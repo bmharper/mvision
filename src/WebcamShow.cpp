@@ -1,4 +1,7 @@
 #include "pch.h"
+#include "cameras/win_capture/capture_device.h"
+#include "cameras/OpenCV.h"
+#include "cameras/live555.h"
 
 #ifdef SX_CCV
 // For libccv
@@ -48,6 +51,7 @@ static Module *Mod = &M_Motion;
 
 // Helpers
 static void LoadCCV();
+static void InitializeLogs();
 static void InitializeCamera();
 
 }
@@ -61,6 +65,8 @@ void xoMain(xoMainEvent ev)
 	case xoMainEventInit:
 		LoadCCV();
 
+		InitializeLogs();
+
 		Global.MainWnd = xoSysWnd::CreateWithDoc();
 		
 		Mod->Start(Global.MainWnd->Doc());
@@ -69,14 +75,15 @@ void xoMain(xoMainEvent ev)
 		InitializeCamera();
 		break;
 	case xoMainEventShutdown:
-		Mod->End();
-		if (Global.Camera)
-			Global.Camera->Close();
-		SafeRelease(&Global.Camera);
+		//Mod->End();
+		delete Global.Camera;
+		Global.Camera = nullptr;
+		//SafeRelease(&Global.Camera);
 		MFShutdown();
 		CoUninitialize();
 		delete Global.MainWnd;
-		Global.MainWnd = NULL;
+		Global.MainWnd = nullptr;
+		//Global.Log = nullptr;
 		break;
 	}
 }
@@ -87,24 +94,57 @@ namespace sx
 static void LoadCCV()
 {
 #ifdef SX_CCV
-	HRESULT res = __HrLoadAllImportsForDll("libccv.dll");
+	//HRESULT res = __HrLoadAllImportsForDll("libccv.dll");
 	// See if *any* code from ccv will execute. I'm getting strange failures on my Win10 machine
-	ccv_matrix_t* mat = ccv_dense_matrix_new(16, 16, CCV_8U | CCV_C1, nullptr, 0);
-	if (mat)
-		ccv_matrix_free(mat);
+	//ccv_matrix_t* mat = ccv_dense_matrix_new(16, 16, CCV_8U | CCV_C1, nullptr, 0);
+	//if (mat)
+	//	ccv_matrix_free(mat);
 #endif
+}
+
+static void InitializeLogs()
+{
+	Global.Log.Level = microlog::Level::Debug;
+	Global.Log.SetFile("c:/temp/mvision.log");
+	Global.Log.Info("Hello");
 }
 
 static void InitializeCamera()
 {
-	HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-	Global.Camera = new CaptureDevice();
-	std::string error;
-	if (!Global.Camera->InitializeFirst(error))
+	if (false)
 	{
-		delete Global.Camera;
-		Global.Camera = NULL;
+		WinCaptureDevice* cam = new WinCaptureDevice();
+		std::string error;
+		if (cam->InitializeFirst(error))
+			Global.Camera = cam;
+		else
+			delete cam;
 	}
+
+#ifdef SX_OPENCV
+	if (!Global.Camera && false)
+	{
+		// This doesn't work on Windows - I get corruption from my HikVision camera.
+		OpenCVCamera* cam = new OpenCVCamera();
+		if (cam->Open("rtsp://admin:PASSWORD@192.168.1.104:554?tcp"))
+			Global.Camera = cam;
+		else
+			delete cam;
+	}
+#endif
+
+#ifdef SX_LIVE555
+	if (!Global.Camera && true)
+	{
+		Live555Environment::Create();
+		Live555Camera* cam = new Live555Camera();
+		if (cam->Open("rtsp://admin:PASSWORD@192.168.1.104:554"))
+			Global.Camera = cam;
+		else
+			delete cam;
+	}
+#endif
 }
+
 
 }

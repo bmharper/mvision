@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "image.h"
+#include "../util/Mem.h"
 
 namespace sx
 {
@@ -20,7 +21,7 @@ Image::~Image()
 
 void Image::Free()
 {
-	free(Buf);
+	AlignedFree(Buf);
 	memcpy(this, &NullImage, sizeof(*this));
 }
 
@@ -29,7 +30,7 @@ bool Image::Alloc(ImgFmt fmt, int width, int height)
 	Free();
 
 	int _stride = ImgStride(ImgFmt_BytesPP(fmt) * width);
-	void* _buf = malloc(_stride * height);
+	void* _buf = AlignedAlloc(_stride * height, MemAlignment);
 	if (!_buf)
 		return false;
 
@@ -50,9 +51,9 @@ void Image::FillBytes(uint8 byteVal) const
 
 void Image::CopyTo(Image* dst) const
 {
-	assert(dst->Width == Width);
-	assert(dst->Height == Height);
-	assert(dst->Fmt == Fmt);
+	SXASSERT(dst->Width == Width);
+	SXASSERT(dst->Height == Height);
+	SXASSERT(dst->Fmt == Fmt);
 
 	int lineLen = ImgFmt_BytesPP(Fmt) * Width;
 	for (int y = 0; y < Height; y++)
@@ -77,6 +78,7 @@ Image* Image::Clone(ImgFmt dstFormat) const
 	}
 	else
 	{
+		// Ahem... Mip2's format converter in need here
 		if (Fmt == ImgFmt::Lum8u && dstFormat == ImgFmt::Lum32f)
 		{
 			for (int y = 0; y < Height; y++)
@@ -97,19 +99,52 @@ Image* Image::Clone(ImgFmt dstFormat) const
 					dst[x] = DivideByThree(src[x3] + src[x3 + 1] + src[x3 + 2]);
 			}
 		}
+		else if (Fmt == ImgFmt::RGBA8u && dstFormat == ImgFmt::Lum8u)
+		{
+			for (int y = 0; y < Height; y++)
+			{
+				uint8* src = RowPtr8u(y);
+				uint8* dst = copy->RowPtr8u(y);
+				for (int x = 0, x4 = 0; x < Width; x++, x4 += 4)
+					dst[x] = DivideByThree(src[x4] + src[x4 + 1] + src[x4 + 2]);
+			}
+		}
 		else
 		{
-			assert(false);
+			SXASSERT(false);
 		}
 	}
 	return copy;
 }
 
+// We need to make Image formats more flexible, like what I did for Mip2
+void Image::FixBGRA_to_RGBA()
+{
+	SXASSERT(Fmt == ImgFmt::RGBA8u);
+	for (int y = 0; y < Height; y++)
+	{
+		uint8* line = RowPtr8u(y);
+		int width4 = Width * 4;
+		for (int x = 0; x < width4; x += 4)
+		{
+			uint8 b = line[x];
+			uint8 g = line[x + 1];
+			uint8 r = line[x + 2];
+			uint8 a = line[x + 3];
+			line[x] = a;
+			line[x + 1] = b;
+			line[x + 2] = g;
+			line[x + 3] = r;
+		}
+	}
+}
+
 template<bool sRGB>
 Image* Util_Lum_HalfSize_Box_T(Image* lum)
 {
-	assert((lum->Width & 1) == 0 && (lum->Height & 1) == 0);
-	assert(lum->Fmt == ImgFmt::Lum8u);
+	SXASSERT((lum->Width & 1) == 0);
+	SXASSERT(lum->Width >= 2 && lum->Height >= 2);
+	SXASSERT(lum->Fmt == ImgFmt::Lum8u);
 
 	Image* half = new Image();
 	if (!half->Alloc(lum->Fmt, lum->Width / 2, lum->Height / 2))
@@ -155,7 +190,7 @@ Image* Image::HalfSize_Box(bool sRGB)
 
 Image* Image::HalfSize_Box_Until(bool sRGB, int widthLessThanOrEqualTo)
 {
-	assert(Width > widthLessThanOrEqualTo);
+	SXASSERT(Width > widthLessThanOrEqualTo);
 
 	Image* image = this;
 	while (image->Width > widthLessThanOrEqualTo)
@@ -173,7 +208,7 @@ Image* Image::HalfSize_Box_Until(bool sRGB, int widthLessThanOrEqualTo)
 #ifdef SX_CCV
 ccv_dense_matrix_t*	Image::ToCCV() const
 {
-	assert(ImgFmt_NChan(Fmt) == 1 && ImgFmt_NBits(Fmt) == 8);
+	SXASSERT(ImgFmt_NChan(Fmt) == 1 && ImgFmt_NBits(Fmt) == 8);
 
 	ccv_dense_matrix_t* mat = ccv_dense_matrix_new(Height, Width, CCV_8U | CCV_C1, nullptr, 0);
 	for (int y = 0; y < Height; y++)
@@ -186,9 +221,41 @@ ccv_dense_matrix_t*	Image::ToCCV() const
 #ifdef SX_OPENCV
 cv::Mat Image::ToOpenCV_NoCopy() const
 {
-	assert(ImgFmt_NBits(Fmt) == 8);
+	SXASSERT(ImgFmt_NBits(Fmt) == 8);
 	return cv::Mat(Height, Width, CV_MAKETYPE(CV_8U, ImgFmt_NChan(Fmt)), Scan0, Stride);
 }
+
+Image* Image::FromOpenCV(cv::Mat mat)
+{
+	int nchan = mat.channels();
+	int depth = mat.depth();
+	if (nchan != 1 && nchan != 3 && nchan != 4)
+		return nullptr;
+	if (depth != CV_8U)
+		return nullptr;
+
+	Image* img = new Image();
+
+	ImgFmt fmt = ImgFmt::Null;
+	switch (nchan)
+	{
+	case 1: fmt = ImgFmt::Lum8u; break;
+	case 3: fmt = ImgFmt::RGB8u; break;
+	case 4: fmt = ImgFmt::RGBA8u; break;
+	}
+
+	if (!img->Alloc(fmt, mat.cols, mat.rows))
+	{
+		delete img;
+		return nullptr;
+	}
+	for (int y = 0; y < mat.rows; y++)
+		memcpy(img->RowPtr(y), mat.ptr(y), img->LineBytes());
+
+	//memset(&mat, 0, sizeof(mat));
+	return img;
+}
+
 #endif
 
 

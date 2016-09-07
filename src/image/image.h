@@ -20,6 +20,8 @@ inline int ImgStride(int rawLenBytes)	{ return (rawLenBytes + 3) & ~3; }
 class Image
 {
 public:
+	enum { MemAlignment = 16 }; // memory alignment is mandated by Intel's Media SDK
+
 	void*	Buf = nullptr;
 	void*	Scan0 = nullptr;
 	ImgFmt	Fmt = ImgFmt::Null;
@@ -33,6 +35,7 @@ public:
 	void	FillBytes(uint8 byteVal) const;
 	void	CopyTo(Image* dst) const;
 	Image*	Clone(ImgFmt dstFormat = ImgFmt::Null) const;
+	void	FixBGRA_to_RGBA();
 	Image* 	HalfSize_Box(bool sRGB);
 	Image* 	HalfSize_Box_Until(bool sRGB, int widthLessThanOrEqualTo);
 
@@ -42,10 +45,12 @@ public:
 
 #ifdef SX_OPENCV
 	cv::Mat ToOpenCV_NoCopy() const;
+	static Image* FromOpenCV(cv::Mat mat);
 #endif
 
 	void*	RowPtr(int row) const { return (byte*) Scan0 + row * Stride; }
 	uint8*	RowPtr8u(int row) const { return (uint8*) Scan0 + row * Stride; }
+	uint32*	RowPtr32u(int row) const { return (uint32*) ((uint8*) Scan0 + row * Stride); }
 	float*	RowPtr32f(int row) const { return (float*) ((uint8*) Scan0 + row * Stride); }
 	int		LineBytes() const { return ImgFmt_BytesPP(Fmt) * Width; }
 };
